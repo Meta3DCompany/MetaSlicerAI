@@ -106,6 +106,11 @@ enum class ERescaleTarget
     SettingsDialog
 };
 
+
+
+
+
+
 #ifdef __APPLE__
 class OrcaSlicerTaskBarIcon : public wxTaskBarIcon
 {
@@ -161,7 +166,7 @@ static wxIcon main_frame_icon(GUI_App::EAppMode app_mode)
     }
     return wxIcon(path, wxBITMAP_TYPE_ICO);
 #else // _WIN32
-    return wxIcon(Slic3r::var("OrcaSlicer.png"), wxBITMAP_TYPE_PNG);
+    return wxIcon(Slic3r::var("logo_360.png"), wxBITMAP_TYPE_PNG);
 #endif // _WIN32
 }
 
@@ -774,6 +779,7 @@ void MainFrame::update_layout()
         m_plater->set_bed_shape({ { 0.0, 0.0 }, { 200.0, 0.0 }, { 200.0, 200.0 }, { 0.0, 200.0 } }, {}, 0.0, {}, {}, true);
         m_plater->get_collapse_toolbar().set_enabled(false);
         m_plater->enable_sidebar(false);
+        m_plater->enable_chatframe(false);
         m_plater->Show();
         break;
     }
@@ -1497,15 +1503,18 @@ wxBoxSizer* MainFrame::create_side_tools()
 
     // m_publish_btn = new Button(this, _L("Upload"), "bar_publish", 0, FromDIP(16));
     m_slice_btn = new SideButton(this, _L("Slice plate"), "");
-    //m_idex_alpha = new Button(this, _L("IDEX"), "");
+    m_idex_alpha = new Button(this, _L("MetaSlicerAI"), "");
     StateColor btn_bg(
-        std::pair<wxColour, int>(wxColour(255, 174, 0  ), StateColor::Pressed),
-        std::pair<wxColour, int>(wxColour(55, 55, 55  ), StateColor::Hovered),
-        std::pair<wxColour, int>(wxColour(255, 174, 0 ), StateColor::Normal)
+         std::pair<wxColour, int>(wxColour(204,139,0), StateColor::Pressed),
+        std::pair<wxColour, int>(wxColour(255, 174, 0 ), StateColor::Hovered),
+       
+        std::pair<wxColour, int>(wxColour(255, 174, 0 ), StateColor::Normal),
+        std::pair<wxColour, int>(wxColour(255, 174, 0 ), StateColor::NotHovered)
+        
     );
     StateColor btn_bd(std::pair<wxColour, int>(wxColour(255, 174, 0 ), StateColor::Normal));
-    //m_idex_alpha->SetBackgroundColor(btn_bg);
-    //m_idex_alpha->SetBorderColor(btn_bd);
+    m_idex_alpha->SetBackgroundColor(btn_bg);
+    m_idex_alpha->SetBorderColor(btn_bd);
     m_slice_option_btn = new SideButton(this, "", "sidebutton_dropdown", 0, FromDIP(14));
     m_print_btn = new SideButton(this, _L("Print plate"), "");
     m_print_option_btn = new SideButton(this, "", "sidebutton_dropdown", 0, FromDIP(14));
@@ -1513,12 +1522,12 @@ wxBoxSizer* MainFrame::create_side_tools()
     update_side_button_style();
     // m_publish_btn->Hide();
     m_slice_option_btn->Enable();
-   // m_idex_alpha->Enable();
-   // m_idex_alpha->Show();
+    m_idex_alpha->Enable();
+    m_idex_alpha->Show();
     m_print_option_btn->Enable();
     // sizer->Add(m_publish_btn, 0, wxLEFT | wxALIGN_CENTER_VERTICAL, FromDIP(1));
     // sizer->Add(FromDIP(15), 0, 0, 0, 0);
-    //sizer->Add(m_idex_alpha, 0, wxLEFT | wxALIGN_CENTER_VERTICAL, FromDIP(1));
+    sizer->Add(m_idex_alpha, 0, wxLEFT | wxALIGN_CENTER_VERTICAL, FromDIP(1));
     sizer->Add(FromDIP(10), 0, 0, 0, 0);
     sizer->Add(m_slice_option_btn, 0, wxRIGHT | wxALIGN_CENTER_VERTICAL, FromDIP(1));
     sizer->Add(m_slice_btn, 0, wxLEFT | wxALIGN_CENTER_VERTICAL, FromDIP(1));
@@ -1545,11 +1554,13 @@ wxBoxSizer* MainFrame::create_side_tools()
     //     });
     // });
     //Meta3D: Idex button is binded
-    //m_idex_alpha->Bind(wxEVT_BUTTON, [this](wxCommandEvent& event)
-    //    {
+    m_idex_alpha->Bind(wxEVT_BUTTON, [this](wxCommandEvent& event)
+        {
            
-    //        wxPostEvent(m_plater, SimpleEvent(EVT_IDEX_COPY));
-    //    });
+            wxPostEvent(m_plater, SimpleEvent(EVT_IDEX_COPY));
+        });
+
+    
     m_slice_btn->Bind(wxEVT_BUTTON, [this](wxCommandEvent& event)
         {
             //this->m_plater->select_view_3D("Preview");
@@ -2572,8 +2583,8 @@ void MainFrame::init_menubar_as_editor()
             viewMenu, wxID_ANY, _L("Reset Window Layout"), _L("Reset to default window layout"),
             [this](wxCommandEvent&) { m_plater->reset_window_layout(); }, "", this,
             [this]() {
-                return (m_tabpanel->GetSelection() == TabPosition::tp3DEditor || m_tabpanel->GetSelection() == TabPosition::tpPreview) &&
-                       m_plater->is_sidebar_enabled();
+                return (m_tabpanel->GetSelection() == TabPosition::tp3DEditor || m_tabpanel->GetSelection() == TabPosition::tpPreview) && //MR: Binding the chatframe to mainframe not tested the implementation
+                       m_plater->is_sidebar_enabled() && m_plater->is_chatframe_enabled();
             },
             this);
 

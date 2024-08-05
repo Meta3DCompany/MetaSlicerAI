@@ -1048,7 +1048,7 @@ PRINT_CONFIG_CLASS_DEFINE(
 )
 
 // This object is mapped to Perl as Slic3r::Config::Print.
-PRINT_CONFIG_CLASS_DERIVED_DEFINE(
+ PRINT_CONFIG_CLASS_DERIVED_DEFINE(
     PrintConfig,
     (MachineEnvelopeConfig, GCodeConfig),
 

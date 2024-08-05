@@ -219,7 +219,7 @@ Button* MsgDialog::add_button(wxWindowID btn_id, bool set_focus /*= false*/, con
 Button* MsgDialog::get_button(wxWindowID btn_id){
     return static_cast<Button*>(FindWindowById(btn_id, this));
 }
-
+//Meta3D: logo
 void MsgDialog::apply_style(long style)
 {
     if (style & wxOK)       add_button(wxID_OK, true, _L("OK"));
@@ -230,7 +230,7 @@ void MsgDialog::apply_style(long style)
     logo->SetBitmap( *get_bmp_bundle(style & wxAPPLY        ? "completed" :
                                           style & wxICON_WARNING        ? "obj_warning" :
                                           style & wxICON_INFORMATION    ? "info"        :
-                                          style & wxICON_QUESTION       ? "question"    : "OrcaSlicer", 64));
+                                          style & wxICON_QUESTION       ? "question"    : "logo_360", 64));
 }
 
 void MsgDialog::finalize()
@@ -242,6 +242,7 @@ void MsgDialog::finalize()
 
 
 // Text shown as HTML, so that mouse selection and Ctrl-V to copy will work.
+//Meta3D: msg
 static void add_msg_content(wxWindow* parent, wxBoxSizer* content_sizer, wxString msg, bool monospaced_font = false, bool is_marked_msg = false)
 {
     wxHtmlWindow* html = new wxHtmlWindow(parent, wxID_ANY, wxDefaultPosition, wxDefaultSize, wxHW_SCROLLBAR_AUTO);

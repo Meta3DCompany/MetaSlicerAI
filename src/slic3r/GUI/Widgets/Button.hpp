@@ -56,6 +56,8 @@ public:
 
     void Rescale();
 
+    void mouseLeave(wxMouseEvent& event);
+
 protected:
 #ifdef __WIN32__
     WXLRESULT MSWWindowProc(WXUINT nMsg, WXWPARAM wParam, WXLPARAM lParam) override;

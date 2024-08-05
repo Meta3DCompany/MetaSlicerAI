@@ -24,9 +24,9 @@
 #include <wx/panel.h>
 // BBS
 #include <wx/notebook.h>
-
+#include "nlohmann/json.hpp"
 #include "Selection.hpp"
-
+#include <curl/curl.h>
 #include "libslic3r/enum_bitmask.hpp"
 #include "libslic3r/Preset.hpp"
 #include "libslic3r/BoundingBox.hpp"
@@ -136,6 +136,9 @@ wxDECLARE_EVENT(EVT_MODIFY_FILAMENT, SimpleEvent);
 
 const wxString DEFAULT_PROJECT_NAME = "Untitled";
 
+
+
+
 class Sidebar : public wxPanel
 {
     ConfigOptionMode    m_mode;
@@ -222,6 +225,78 @@ private:
     ScalableButton* connection_btn = nullptr;
     ScalableButton* ams_btn = nullptr;
 };
+
+class IObserver {
+public:
+    virtual ~IObserver() = default;
+    virtual void Update(const std::string& botResponse) = 0;
+};
+
+class Subject {
+public:
+    void AddObserver(IObserver* observer) {
+        observers.push_back(observer);
+    }
+
+    void RemoveObserver(IObserver* observer) {
+        observers.erase(std::remove(observers.begin(), observers.end(), observer), observers.end());
+    }
+
+    void NotifyObservers(const std::string& botResponse) {
+        for (IObserver* observer : observers) {
+            observer->Update(botResponse);
+        }
+    }
+
+    
+
+protected:
+    std::vector<IObserver*> observers;
+};
+
+class ChatFrame : public wxPanel,  public Subject {
+public:
+    enum ConnectionStatus {
+        Disconnected, Connected
+    };
+
+    ChatFrame(Plater* parent);
+    ChatFrame(ChatFrame&&) = delete;
+    ChatFrame(const ChatFrame&) = delete;
+    ChatFrame& operator=(ChatFrame&&) = delete;
+    ChatFrame& operator=(const ChatFrame&) = delete;
+    ~ChatFrame();
+
+    void sendMessage(const wxString& message);
+    void receiveMessage(const wxString& message);
+    void updateChatDisplay();
+    void clearChat();
+    void connectToServer();
+    void disconnectFromServer();
+
+private:
+    struct privChat;
+    std::unique_ptr<privChat> p;
+
+    wxTextCtrl* chatDisplay;
+    wxTextCtrl* userInput;
+    wxButton* sendButton;
+    wxButton* connectButton;
+    wxButton* disconnectButton;
+    ConnectionStatus connectionStatus;
+
+
+    void OnSend(wxCommandEvent& event);
+    wxString CallChatbotAPI(const wxString& userText);
+
+
+    void ProcessRasaResponse (const std::string& response, std::string& entity, std::string& operation);
+    void onSendButtonClicked(wxCommandEvent& event);
+    void onConnectButtonClicked(wxCommandEvent& event);
+    void onDisconnectButtonClicked(wxCommandEvent& event);
+};
+
+
 
 class Plater: public wxPanel
 {
@@ -383,9 +458,16 @@ public:
     void show_view3D_overhang(bool show);
 
     bool is_sidebar_enabled() const;
+    bool is_chatframe_enabled() const;
+
     void enable_sidebar(bool enabled);
+    void enable_chatframe(bool enabled);
     bool is_sidebar_collapsed() const;
+    bool is_chatframe_collapsed() const;
+
+    void collapse_chatframe(bool collapse);
     void collapse_sidebar(bool collapse);
+    
     Sidebar::DockingState get_sidebar_docking_state() const;
 
     void reset_window_layout();
@@ -612,6 +694,7 @@ public:
 #endif
 
     bool init_collapse_toolbar();
+    bool init_collapse_chatframe();
 
     const Camera& get_camera() const;
     Camera& get_camera();

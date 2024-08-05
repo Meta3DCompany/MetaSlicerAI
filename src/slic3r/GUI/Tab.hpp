@@ -382,7 +382,8 @@ public:
 	DynamicPrintConfig*	get_config() { return m_config; }
     PresetCollection *  get_presets() { return m_presets; }
     TabPresetComboBox *  get_combo_box() { return m_presets_choice; }
-
+	ConfigManipulation m_config_manipulation;
+    ConfigManipulation get_config_manipulation();
 	virtual void    on_value_change(const std::string& opt_key, const boost::any& value);
 
     void            update_wiping_button_visibility();
@@ -420,8 +421,7 @@ protected:
 	void			update_frequently_changed_parameters();
 	void			set_tooltips_text();
 
-    ConfigManipulation m_config_manipulation;
-    ConfigManipulation get_config_manipulation();
+    
 };
 
 class TabPrint : public Tab

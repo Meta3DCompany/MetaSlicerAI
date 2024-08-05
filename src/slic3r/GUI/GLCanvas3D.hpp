@@ -188,6 +188,7 @@ wxDECLARE_EVENT(EVT_GLCANVAS_JUMP_TO, wxKeyEvent);
 wxDECLARE_EVENT(EVT_GLCANVAS_UNDO, SimpleEvent);
 wxDECLARE_EVENT(EVT_GLCANVAS_REDO, SimpleEvent);
 wxDECLARE_EVENT(EVT_GLCANVAS_COLLAPSE_SIDEBAR, SimpleEvent);
+wxDECLARE_EVENT(EVT_GLCANVAS_COLLAPSE_CHATFRAME, SimpleEvent);
 wxDECLARE_EVENT(EVT_GLCANVAS_RELOAD_FROM_DISK, SimpleEvent);
 wxDECLARE_EVENT(EVT_GLCANVAS_RENDER_TIMER, wxTimerEvent/*RenderTimerEvent*/);
 wxDECLARE_EVENT(EVT_GLCANVAS_TOOLBAR_HIGHLIGHTER_TIMER, wxTimerEvent);
@@ -1141,6 +1142,8 @@ private:
     // BBS
     //bool _init_view_toolbar();
     bool _init_collapse_toolbar();
+
+    bool _init_collapse_chatframe();
 
     bool _set_current();
     void _resize(unsigned int w, unsigned int h);

@@ -10,10 +10,16 @@
       "0.4"
     ],
     "printable_area": [
-      "0x0",
-      "250x0",
-      "250x250",
-      "0x250"
+        "0x0",
+        "500x0",
+        "500x300",
+        "0x300"
+      ],
+      "bed_exclude_area": [
+        "240x0",
+        "500x0",
+        "500x300",
+        "240x300"
     ],
     "printable_height": "400",
     "nozzle_type": "undefine",

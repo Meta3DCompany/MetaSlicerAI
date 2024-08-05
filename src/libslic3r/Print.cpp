@@ -41,7 +41,7 @@
 #include "PrintConfig.hpp"
 #include "Model.hpp"
 #include <float.h>
-
+//#include <wx/app.h>
 #include <algorithm>
 #include <limits>
 #include <unordered_set>
@@ -861,11 +861,13 @@ StringObjectException Print::sequential_print_clearance_valid(const Print &print
 static StringObjectException layered_print_cleareance_valid(const Print &print, StringObjectException *warning)
 {
     std::vector<const PrintInstance*> print_instances_ordered = sort_object_instances_by_model_order(print, true);
+    print.get_plate_name();
     if (print_instances_ordered.size() < 1)
         return {};
 
     auto print_config = print.config();
     Pointfs excluse_area_points = print_config.bed_exclude_area.values;
+    
     Polygons exclude_polys;
     Polygon exclude_poly;
     const Vec3d print_origin = print.get_plate_origin();
@@ -877,13 +879,18 @@ static StringObjectException layered_print_cleareance_valid(const Print &print, 
             exclude_poly.points.clear();
         }
     }
-
+    
     std::map<const PrintInstance*, Polygon> map_model_object_to_convex_hull;
     // sequential_print_horizontal_clearance_valid
     Polygons convex_hulls_other;
     for (int k = 0; k < print_instances_ordered.size(); k++)
     {
         auto& inst = print_instances_ordered[k];
+        //if(true)
+        //{
+        //    continue;
+       // }
+
         auto it_convex_hull = map_model_object_to_convex_hull.find(inst);
         // Get convex hull of all printable volumes assigned to this print object.
         const ModelInstance* model_instance0 = inst->model_instance;
@@ -911,6 +918,9 @@ static StringObjectException layered_print_cleareance_valid(const Print &print, 
                 warning->object = inst->model_instance->get_object();
             }
         }
+        //std::string preset_name = wxGetApp().preset_bundle->printers.get_selected_preset().name;
+        //Meta3D: Exclude area part
+
         if (!intersection(exclude_polys, convex_hull).empty()) {
             return {inst->model_instance->get_object()->name + L(" is too close to exclusion area, there may be collisions when printing.") + "\n", inst->model_instance->get_object()};
             /*if (warning) {
@@ -921,7 +931,9 @@ static StringObjectException layered_print_cleareance_valid(const Print &print, 
         convex_hulls_other.emplace_back(convex_hull);
     }
 
+
     //BBS: add the wipe tower check logic
+    
     const PrintConfig &       config   = print.config();
     int                 filaments_count = print.extruders().size();
     int                 plate_index = print.get_plate_index();

@@ -669,8 +669,9 @@ StringObjectException BackgroundSlicingProcess::validate(StringObjectException *
 {
 	assert(m_print != nullptr);
     assert(m_print == m_fff_print);
-
+	//wxGetApp().mainframe->output_through_framename("fdsaf");
     m_fff_print->is_BBL_printer() = wxGetApp().preset_bundle->is_bbl_vendor();
+	
     return m_print->validate(warning, collison_polygons, height_polygons);
 }
 

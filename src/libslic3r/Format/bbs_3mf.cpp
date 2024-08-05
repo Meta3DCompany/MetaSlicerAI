@@ -5604,6 +5604,7 @@ void PlateData::parse_filament_info(GCodeProcessorResult *result)
     }
 
     //BBS: add plate data related logic
+    //Meta3D: Internal save model to file function
     bool _BBS_3MF_Exporter::_save_model_to_file(const std::string& filename,
         Model& model,
         PlateDataPtrs& plate_data_list,

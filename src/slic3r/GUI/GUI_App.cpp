@@ -2481,7 +2481,7 @@ bool GUI_App::on_init_inner()
 #ifndef __linux__
         wxYield();
 #endif
-        scrn->SetText(_L("Loading configuration xdd")+ dots);
+        scrn->SetText(_L("Loading configuration")+ dots);
     }
 
     BOOST_LOG_TRIVIAL(info) << "loading systen presets...";
@@ -2534,8 +2534,8 @@ bool GUI_App::on_init_inner()
                         skip_this_version = false;
                     }
                 }
-                if (!skip_this_version
-                    || evt.GetInt() != 0) {
+                //Meta3D: Close update dialog
+                if (false) {
                     UpdateVersionDialog dialog(this->mainframe);
                     wxString            extmsg = wxString::FromUTF8(version_info.description);
                     dialog.update_version_info(extmsg, version_info.version_str);

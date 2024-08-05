@@ -17,10 +17,12 @@
 namespace Slic3r {
 namespace GUI {
 
+//MR: It makes the configuration change
 void ConfigManipulation::apply(DynamicPrintConfig* config, DynamicPrintConfig* new_config)
 {
     bool modified = false;
     m_applying_keys = config->diff(*new_config);
+     
     for (auto opt_key : m_applying_keys) {
         config->set_key_value(opt_key, new_config->option(opt_key)->clone());
         modified = true;

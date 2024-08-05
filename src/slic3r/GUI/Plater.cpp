@@ -17,6 +17,8 @@
 ///|/
 ///|/ PrusaSlicer is released under the terms of the AGPLv3 or higher
 ///|/
+#include <cmath>
+#include <regex>
 #include "Plater.hpp"
 #include "libslic3r/Config.hpp"
 #include <iostream>
@@ -37,7 +39,7 @@
 #include <boost/uuid/uuid.hpp>
 #include <boost/uuid/uuid_generators.hpp>
 #include <boost/uuid/uuid_io.hpp>
-
+#include <sstream>
 #include <wx/sizer.h>
 #include <wx/stattext.h>
 #include <wx/button.h>
@@ -174,15 +176,21 @@ using Slic3r::Preset;
 using Slic3r::GUI::format_wxstr;
 using namespace nlohmann;
 
-static const std::pair<unsigned int, unsigned int> THUMBNAIL_SIZE_3MF = { 512, 512 };
 
+
+
+static const std::pair<unsigned int, unsigned int> THUMBNAIL_SIZE_3MF = { 512, 512 };
+int varky = 0;
 namespace Slic3r {
+
 namespace GUI {
 std::vector<Model> modelx;
 bool idex_toggle = false;
 LoadStrategy m_strategy = LoadStrategy::Default;
 bool load_in_mirror = false;
 int stupid = 0;
+
+bool stupid2 = false;
 
 Coordinates::Coordinates()
 {}
@@ -504,6 +512,8 @@ struct Sidebar::priv
 #endif
 };
 
+
+
 Sidebar::priv::~priv()
 {
     // BBS
@@ -648,6 +658,258 @@ static struct DynamicFilamentList : DynamicList
         DynamicList::update();
     }
 } dynamic_filament_list;
+
+class ConfigOperations 
+{
+public:
+    void test ()
+    {
+            
+    }    
+};
+
+class StrengthenObserver : public IObserver , public ConfigOperations{
+
+private:
+    double defaultParameter;
+    float firstLayer; 
+    double outer_wall;
+    double inner_wall;
+    double top_surface;
+    double sparse_infill;
+    double internal_solid_infill;
+    double support;
+    int strengthCoefficient;
+
+
+public:
+    void Update(const std::string& botResponse) override {
+       if (botResponse == "strengthen()") {
+            const DynamicPrintConfig& printer_config = wxGetApp().preset_bundle->printers.get_edited_preset().config;
+            DynamicPrintConfig& print_config = wxGetApp().preset_bundle->prints.get_edited_preset().config;
+            double nozzle_diameter = printer_config.option<ConfigOptionFloats>("nozzle_diameter")->get_at(0);
+            this->defaultParameter = nozzle_diameter +0.1;
+            this->firstLayer = nozzle_diameter + 0.05;
+            this->outer_wall = nozzle_diameter * 1.25;
+            this->inner_wall = nozzle_diameter * 1.50;
+            this->top_surface = nozzle_diameter * 1.25; 
+            this->sparse_infill = nozzle_diameter * 1.75;
+            this->internal_solid_infill = nozzle_diameter * 1.45;
+            this->support = nozzle_diameter;
+
+            wxGetApp().get_tab(Preset::TYPE_PRINT)->get_config_manipulation();
+            DynamicPrintConfig new_conf = *wxGetApp().get_tab(Preset::TYPE_PRINT)->m_config;
+            new_conf.set_key_value("initial_layer_line_width", new ConfigOptionFloatOrPercent(firstLayer, false));
+            new_conf.set_key_value("outer_wall_line_width", new ConfigOptionFloatOrPercent(outer_wall, false));
+            new_conf.set_key_value("line_width", new ConfigOptionFloatOrPercent(defaultParameter, false));
+            new_conf.set_key_value("internal_solid_infill_line_width", new ConfigOptionFloatOrPercent(internal_solid_infill, false));
+            new_conf.set_key_value("sparse_infill_line_width", new ConfigOptionFloatOrPercent(sparse_infill, false));
+            new_conf.set_key_value("inner_wall_line_width", new ConfigOptionFloatOrPercent(inner_wall, false));
+            new_conf.set_key_value("top_surface_line_width", new ConfigOptionFloatOrPercent(top_surface, false));
+            new_conf.set_key_value("support_line_width", new ConfigOptionFloatOrPercent(support, false));
+            //new_conf.set_key_value("internal_solid_infill_line_width", new ConfigOptionFloatOrPercent(internal_solid_infill, false));
+           
+           
+            
+            
+            double wall_loops_res = ((3-outer_wall)/inner_wall)+1;
+            int wall_loops_res_floored = static_cast<int>(std::ceil(wall_loops_res));
+            new_conf.set_key_value("wall_loops", new ConfigOptionInt(wall_loops_res_floored));
+            wxGetApp().get_tab(Preset::TYPE_PRINT)->get_config_manipulation().apply(wxGetApp().get_tab(Preset::TYPE_PRINT)->m_config,&new_conf);
+        }
+    }
+
+private:
+   
+};
+
+
+
+
+class DisconnectObserver : public IObserver {
+public:
+    void Update(const std::string& botResponse) override {
+        
+    }
+    
+
+
+
+};
+
+
+//MR: Privchat can be changed to priv, it takes long compile times 
+struct ChatFrame::privChat {
+    Plater *plater;
+
+    // Constructor accepting a Plater*
+    privChat(Plater *plater) : plater(plater) {}
+};
+
+static size_t WriteCallback(void* contents, size_t size, size_t nmemb, void* userp) {
+    ((std::string*)userp)->append((char*)contents, size * nmemb);
+    return size * nmemb;
+}
+
+void ChatFrame::ProcessRasaResponse(const std::string& response, std::string& entity, std::string& operation) {
+    std::regex entity_regex(R"(\$ENTITY: (\w+))");
+    std::regex operation_regex(R"(\$OPERATION: (\w+\(\)))");
+
+    std::smatch match;
+    if (std::regex_search(response, match, entity_regex)) {
+        entity = match[1].str();
+    }
+    if (std::regex_search(response, match, operation_regex)) {
+        operation = match[1].str();
+    }
+
+    
+    
+    NotifyObservers(operation);
+      
+}
+
+
+void ChatFrame::OnSend(wxCommandEvent& event) {
+    wxString userText = userInput->GetValue();
+    if (userText.IsEmpty()) return;
+
+  
+    chatDisplay->SetDefaultStyle(wxTextAttr(*wxGREEN));
+
+    chatDisplay->AppendText("User: "); 
+    chatDisplay->SetDefaultStyle(wxTextAttr(*wxWHITE));
+    chatDisplay->AppendText(userText + "\n");
+    userInput->Clear();
+
+    wxString botResponse = CallChatbotAPI(userText);
+
+    
+    chatDisplay->SetDefaultStyle(wxTextAttr(*wxRED));
+    chatDisplay->AppendText("Bot: ");
+
+   
+    chatDisplay->SetDefaultStyle(wxTextAttr(*wxWHITE));
+    chatDisplay->AppendText(botResponse + "\n");
+    std::string entity;
+    std::string operation;
+    std::string botResponseStr = botResponse.ToStdString(); 
+    ProcessRasaResponse(botResponseStr, entity,  operation);
+ 
+}
+
+wxString ChatFrame::CallChatbotAPI(const wxString& userText) {
+    CURL* curl;
+    CURLcode res;
+    std::string readBuffer;
+
+    curl_global_init(CURL_GLOBAL_DEFAULT);
+    curl = curl_easy_init();
+    if(curl) {
+        std::string postFields = "{\"sender\":\"user\",\"message\":\"" + std::string(userText.mb_str()) + "\"}";
+
+        curl_easy_setopt(curl, CURLOPT_URL, "http://localhost:5005/webhooks/rest/webhook");
+        struct curl_slist* headers = NULL;
+        headers = curl_slist_append(headers, "Content-Type: application/json");
+        curl_easy_setopt(curl, CURLOPT_HTTPHEADER, headers);
+        curl_easy_setopt(curl, CURLOPT_POSTFIELDS, postFields.c_str());
+
+        curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, WriteCallback);
+        curl_easy_setopt(curl, CURLOPT_WRITEDATA, &readBuffer);
+        res = curl_easy_perform(curl);
+
+        if(res != CURLE_OK) {
+            fprintf(stderr, "curl_easy_perform() failed: %s\n", curl_easy_strerror(res));
+        }
+        curl_easy_cleanup(curl);
+    }
+    curl_global_cleanup();
+
+    wxString botResponse;
+    try {
+        // Parse JSON response
+        auto response = json::parse(readBuffer);
+        if (!response.empty() && response[0].contains("text")) {
+            botResponse = wxString(response[0]["text"].get<std::string>());
+            
+
+            auto first_object =response[0];
+
+
+            if (first_object.contains("text"))
+            {
+
+                if(response[0]["text"].get<std::string>().find("##entities##") != std::string::npos)
+                {
+                    chatDisplay->AppendText(wxString(response[0]["recipient_id"].get<std::string>()) + "\n");
+                }
+            }
+            
+            
+        } else {
+            botResponse = "Unexpected response format.";
+        }
+    } catch (json::parse_error& e) {
+        botResponse = "Failed to parse response.";
+    }
+    
+    
+    return botResponse;
+}
+
+
+
+
+ChatFrame::ChatFrame(Plater* parent)
+    :wxPanel(parent, wxID_ANY, wxDefaultPosition, wxSize(42 * wxGetApp().em_unit(), -1)), p(new privChat(parent)),  // Initializing the base class
+      chatDisplay(nullptr),
+      userInput(nullptr),
+      sendButton(nullptr),
+      connectButton(nullptr),
+      disconnectButton(nullptr),
+      connectionStatus(Disconnected)  // Now 'priv' is a complete type
+{
+    // Initialize your UI components here
+    chatDisplay = new wxTextCtrl(this, wxID_ANY, "", wxDefaultPosition, wxDefaultSize, wxTE_MULTILINE | wxTE_READONLY);
+    userInput = new wxTextCtrl(this, wxID_ANY, "", wxDefaultPosition, wxDefaultSize, wxTE_PROCESS_ENTER);
+    sendButton = new wxButton(this, wxID_ANY, "Send");
+    //connectButton = new wxButton(this, wxID_ANY, "Connect");
+    //disconnectButton = new wxButton(this, wxID_ANY, "Disconnect");
+
+    // Layout and sizers
+    wxBoxSizer* mainSizer = new wxBoxSizer(wxVERTICAL);
+    mainSizer->Add(chatDisplay, 1, wxEXPAND | wxALL, 5);
+    mainSizer->Add(userInput, 0, wxEXPAND | wxALL, 5);
+    mainSizer->Add(sendButton, 0, wxALIGN_CENTER | wxALL, 5);
+    //mainSizer->Add(connectButton, 0, wxALIGN_CENTER | wxALL, 5);
+    //mainSizer->Add(disconnectButton, 0, wxALIGN_CENTER | wxALL, 5);
+
+    this->SetSizerAndFit(mainSizer);
+
+    // Bind events
+    sendButton->Bind(wxEVT_BUTTON, &ChatFrame::OnSend, this);
+    userInput->Bind(wxEVT_TEXT_ENTER, &ChatFrame::OnSend, this);
+
+    AddObserver(new StrengthenObserver());
+    AddObserver(new DisconnectObserver());
+    //connectButton->Bind(wxEVT_BUTTON, &ChatFrame::onConnectButtonClicked, this);
+    //disconnectButton->Bind(wxEVT_BUTTON, &ChatFrame::onDisconnectButtonClicked, this);
+}
+
+ChatFrame::~ChatFrame() = default;
+
+void ChatFrame::onSendButtonClicked(wxCommandEvent& event) {
+    // Handle send button click
+}
+
+void ChatFrame::onConnectButtonClicked(wxCommandEvent& event) {
+    // Handle connect button click
+}
+
+void ChatFrame::onDisconnectButtonClicked(wxCommandEvent& event) {
+    // Handle disconnect button click
+}
+
 
 Sidebar::Sidebar(Plater *parent)
     : wxPanel(parent, wxID_ANY, wxDefaultPosition, wxSize(42 * wxGetApp().em_unit(), -1)), p(new priv(parent))
@@ -1875,7 +2137,8 @@ void Sidebar::update_mode()
 
 bool Sidebar::is_collapsed() { return p->plater->is_sidebar_collapsed(); }
 
-void Sidebar::collapse(bool collapse) { p->plater->collapse_sidebar(collapse); }
+void Sidebar::collapse(bool collapse) { p->plater->collapse_sidebar(collapse);
+ }
 
 #ifdef _MSW_DARK_MODE
 void Sidebar::show_mode_sizer(bool show)
@@ -2111,12 +2374,21 @@ struct Plater::priv
     wxPanel* current_panel{ nullptr };
     std::vector<wxPanel*> panels;
     Sidebar *sidebar;
+    ChatFrame *chatBot;
     struct SidebarLayout
     {
         bool                  is_enabled{false};
         bool                  is_collapsed{false};
         bool                  show{false};
     } sidebar_layout;
+
+    struct ChatFrameLayout
+    {
+        bool                  is_enabled{false};
+        bool                  is_collapsed{false};
+        bool                  show{false};
+    } chatframe_layout;
+
     Bed3D bed;
     Camera camera;
     //BBS: partplate related structure
@@ -2143,6 +2415,7 @@ struct Plater::priv
     // BBS
     //GLToolbar view_toolbar;
     GLToolbar collapse_toolbar;
+    GLToolbar collapse_chatbar;
     Preview *preview;
     AssembleView* assemble_view { nullptr };
     bool first_enter_assemble{ true };
@@ -2254,8 +2527,14 @@ struct Plater::priv
     }
 
     void enable_sidebar(bool enabled);
+    void enable_chatframe(bool enabled);
+
     void collapse_sidebar(bool collapse);
+    void collapse_chatframe(bool collapse);
     void update_sidebar(bool force_update = false);
+    void update_chatframe(bool force_update = false);
+
+
     void reset_window_layout();
     Sidebar::DockingState get_sidebar_docking_state();
 
@@ -2268,6 +2547,7 @@ struct Plater::priv
 
     // BBS
     bool init_collapse_toolbar();
+    bool init_collapse_chatframe();
 
     // BBS
     void hide_select_machine_dlg()
@@ -2669,12 +2949,14 @@ Plater::priv::priv(Plater *q, MainFrame *main_frame)
         "best_object_pos"
         }))
     , sidebar(new Sidebar(q))
+    , chatBot(new ChatFrame(q))
     , notification_manager(std::make_unique<NotificationManager>(q))
     , m_worker{q, std::make_unique<NotificationProgressIndicator>(notification_manager.get()), "ui_worker"}
     , m_sla_import_dlg{new SLAImportDialog{q}}
     , m_job_prepare_state(Job::JobPrepareState::PREPARE_STATE_DEFAULT)
     , delayed_scene_refresh(false)
     , collapse_toolbar(GLToolbar::Normal, "Collapse")
+    , collapse_chatbar(GLToolbar::Normal, "Collapse")
     //BBS :partplatelist construction
     , partplate_list(this->q, &model)
 {
@@ -2766,6 +3048,16 @@ Plater::priv::priv(Plater *q, MainFrame *main_frame)
                                    .Floatable(true)
                                    .BestSize(wxSize(42 * wxGetApp().em_unit(), 90 * wxGetApp().em_unit())));
 
+
+    m_aui_mgr.AddPane(chatBot, wxAuiPaneInfo()
+                                   .Name("chatFrame")
+                                   .Right()
+                                   .CloseButton(false)
+                                   .TopDockable(false)
+                                   .BottomDockable(false)
+                                   .Floatable(true)
+                                   .BestSize(wxSize(42 * wxGetApp().em_unit(), 90 * wxGetApp().em_unit())));
+
     auto* panel_sizer = new wxBoxSizer(wxHORIZONTAL);
     panel_sizer->Add(view3D, 1, wxEXPAND | wxALL, 0);
     panel_sizer->Add(preview, 1, wxEXPAND | wxALL, 0);
@@ -2776,18 +3068,28 @@ Plater::priv::priv(Plater *q, MainFrame *main_frame)
     m_default_window_layout = m_aui_mgr.SavePerspective();
 
     // Load previous window layout
+    //MR: Loads and readies the app config and layout
     {
-        const auto cfg    = wxGetApp().app_config;
-        wxString   layout = wxString::FromUTF8(cfg->get("window_layout"));
-        if (!layout.empty()) {
-            m_aui_mgr.LoadPerspective(layout, false);
-            auto& sidebar = m_aui_mgr.GetPane(this->sidebar);
-            sidebar_layout.is_collapsed = !sidebar.IsShown();
-        }
+        // const auto cfg    = wxGetApp().app_config;
+        // wxString   layout = wxString::FromUTF8(cfg->get("window_layout"));
+        // if (!layout.empty()) {
+        //     m_aui_mgr.LoadPerspective(layout, false);
+        //     auto& sidebar = m_aui_mgr.GetPane(this->sidebar);
+        //     sidebar_layout.is_collapsed = !sidebar.IsShown();
+        // }
     }
-
+     //m_aui_mgr.AddPane(sidebar, wxAuiPaneInfo()
+                                   //.Name("chatBot")
+                                   //.Right()
+                                   //.CloseButton(false)
+                                   //.TopDockable(false)
+                                   //.BottomDockable(false)
+                                   //.Floatable(false)
+                                   //.BestSize(wxSize(42 * wxGetApp().em_unit(), 90 * wxGetApp().em_unit())));
     menus.init(q);
-
+    //wxWindow* new_pane = new wxPanel(this, wxID_ANY);
+    //m_aui_mgr.AddPane(new_pane, wxAuiPaneInfo().Name("NewPane").Right().Layer(1).Position(1).CloseButton(true).MaximizeButton(true));
+    m_aui_mgr.Update();
   
 
     if (wxGetApp().is_editor()) {
@@ -2858,7 +3160,10 @@ Plater::priv::priv(Plater *q, MainFrame *main_frame)
         view3D_canvas->Bind(EVT_GLCANVAS_RESETGIZMOS, [this](SimpleEvent&) { reset_all_gizmos(); });
         view3D_canvas->Bind(EVT_GLCANVAS_UNDO, [this](SimpleEvent&) { this->undo(); });
         view3D_canvas->Bind(EVT_GLCANVAS_REDO, [this](SimpleEvent&) { this->redo(); });
+
         view3D_canvas->Bind(EVT_GLCANVAS_COLLAPSE_SIDEBAR, [this](SimpleEvent&) { this->q->collapse_sidebar(!this->q->is_sidebar_collapsed());  });
+        view3D_canvas->Bind(EVT_GLCANVAS_COLLAPSE_CHATFRAME, [this](SimpleEvent&) { this->q->collapse_chatframe(!this->q->is_chatframe_collapsed());    });
+
         view3D_canvas->Bind(EVT_GLCANVAS_RESET_LAYER_HEIGHT_PROFILE, [this](SimpleEvent&) { this->view3D->get_canvas3d()->reset_layer_height_profile(); });
         view3D_canvas->Bind(EVT_GLCANVAS_ADAPTIVE_LAYER_HEIGHT_PROFILE, [this](Event<float>& evt) { this->view3D->get_canvas3d()->adaptive_layer_height_profile(evt.data); });
         view3D_canvas->Bind(EVT_GLCANVAS_SMOOTH_LAYER_HEIGHT_PROFILE, [this](HeightProfileSmoothEvent& evt) { this->view3D->get_canvas3d()->smooth_layer_height_profile(evt.data); });
@@ -3294,7 +3599,20 @@ void Plater::priv::enable_sidebar(bool enabled)
     sidebar_layout.is_enabled = enabled;
     update_sidebar();
 }
+void Plater::priv::enable_chatframe(bool enabled)
+{
+    if (q->m_only_gcode)
+        enabled = false;
 
+    chatframe_layout.is_enabled = enabled;
+    update_chatframe(); //this is buggy
+    
+}
+
+
+
+
+//Meta3D: In search of creating a chatbot
 void Plater::priv::collapse_sidebar(bool collapse)
 {
     if (q->m_only_gcode)
@@ -3308,11 +3626,62 @@ void Plater::priv::collapse_sidebar(bool collapse)
                               : _u8L("Collapse sidebar");
     new_tooltip += " [Shift+Tab]";
     int id = collapse_toolbar.get_item_id("collapse_sidebar");
+    //wxGetApp().mainframe->output_through_framename(std::to_string(id));
     collapse_toolbar.set_tooltip(id, new_tooltip);
 
-    update_sidebar();
+    update_sidebar(); //MR: Responsible for collapsing the sidebar
+
+    
 }
 
+void Plater::priv::collapse_chatframe(bool collapse)
+{
+    if (q->m_only_gcode)
+        return;
+
+    chatframe_layout.is_collapsed = collapse;
+
+    // Now update the tooltip in the toolbar.
+    std::string new_tooltip = collapse
+                              ? _u8L("Expand sidebar")
+                              : _u8L("Collapse sidebar");
+    new_tooltip += " [Shift+Tab]";
+    int id = collapse_chatbar.get_item_id("collapse_chatframe");
+    collapse_chatbar.set_tooltip(id, new_tooltip);
+
+    update_chatframe(); //MR: Responsible for collapsing the sidebar
+
+    
+}
+
+void Plater::priv::update_chatframe(bool force_update) {
+    auto& chatframe = m_aui_mgr.GetPane(this->chatBot);
+    bool  needs_update = force_update;
+
+   
+    //if (!chatframe_layout.is_enabled) { //MR: This if statement is buggy might fix later   
+        if (chatframe.IsShown()) {
+            chatframe.Hide(); //MR: This is the part that makes the chatframe dissapear
+            needs_update = true;
+            
+        }
+    //}
+     else {
+        bool should_show = chatframe_layout.show && !chatframe_layout.is_collapsed; //MR: Check this variabled
+        if (should_show != chatframe.IsShown()) {
+            chatframe.Show(should_show);
+            needs_update = true;
+        }
+    }
+
+    if (needs_update) {
+        //notification_manager->set_sidebar_collapsed(sidebar.IsShown());
+        m_aui_mgr.Update(); //MR: Collapses and un-collapses the sidebae
+    }
+    
+}
+
+//MR: Responsible for collapsing and un-collapsing the toolbar
 void Plater::priv::update_sidebar(bool force_update) {
     auto& sidebar = m_aui_mgr.GetPane(this->sidebar);
     bool  needs_update = force_update;
@@ -3332,8 +3701,9 @@ void Plater::priv::update_sidebar(bool force_update) {
 
     if (needs_update) {
         notification_manager->set_sidebar_collapsed(sidebar.IsShown());
-        m_aui_mgr.Update();
+        m_aui_mgr.Update(); //MR: Collapses and un-collapses the sidebar
     }
+    
 }
 
 void Plater::priv::reset_window_layout()
@@ -3445,23 +3815,32 @@ std::string read_binary_stl(const std::string& filename) {
 
 
 // BBS: backup & restore
+
+//Meta3D: Here is important to fix 3mf
 std::vector<size_t> Plater::priv::load_files(const std::vector<fs::path>& input_files, LoadStrategy strategy, bool ask_multi, int index, bool load_to_idex_machine)
 {   
     
-
+    
+  
     std::string preset_name = wxGetApp().preset_bundle->printers.get_selected_preset().name;
-
+    // wxGetApp().mainframe->output_through_framename(std::to_string(model.objects.size() ));
     if((preset_name=="Meta3D XPro - MIRROR" ||preset_name=="Meta3D XPro - COPY")&& !load_to_idex_machine)
     {
+        
+        //if(q->load_offset == 0)
+        //{
+         //   q->load_offset = model.objects.size()/2;
+        //}
         remove_idex();
         load_in_mirror = true;
-        
+    
     }
     if(!(strategy == LoadStrategy::IdexCopy|| strategy ==LoadStrategy::IdexMirror))     
     {
         idex_files_vector.push_back(input_files);
     }
 
+   // 
 
 
     
@@ -3501,7 +3880,7 @@ std::vector<size_t> Plater::priv::load_files(const std::vector<fs::path>& input_
     const auto loading = _L("Loading") + dots;
     ProgressDialog dlg(loading, "", 100, find_toplevel_parent(q), wxPD_AUTO_HIDE | wxPD_CAN_ABORT | wxPD_APP_MODAL);
     wxBusyCursor busy;
-
+     
     auto *new_model = (!load_model || one_by_one) ? nullptr : new Slic3r::Model();
     std::vector<size_t> obj_idxs;
 
@@ -3540,8 +3919,11 @@ std::vector<size_t> Plater::priv::load_files(const std::vector<fs::path>& input_
     const float INIT_MODEL_RATIO             = 0.75;
     const float CENTER_AROUND_ORIGIN_RATIO   = 0.8;
     const float LOAD_MODEL_RATIO             = 0.9;
-
+    int saçma =0;
+    
+    
     for (size_t i = 0; i < input_files.size(); ++i) {
+        saçma++;
         int file_percent = 0;
 
 #ifdef _WIN32
@@ -3565,7 +3947,10 @@ std::vector<size_t> Plater::priv::load_files(const std::vector<fs::path>& input_
         const bool type_any_amf = !type_3mf && std::regex_match(path.string(), pattern_any_amf);
         // const bool type_prusa   = std::regex_match(path.string(), pattern_prusa);
 
+         // 
+
         Slic3r::Model model;
+        
         // BBS: add auxiliary files related logic
         bool load_aux = strategy & LoadStrategy::LoadAuxiliary, load_old_project = false;
         if (load_model && load_config && type_3mf) {
@@ -3575,11 +3960,21 @@ std::vector<size_t> Plater::priv::load_files(const std::vector<fs::path>& input_
         if (load_config) strategy = strategy | LoadStrategy::CheckVersion;
         bool is_project_file = false;
         BOOST_LOG_TRIVIAL(info) << __FUNCTION__ << boost::format(": is_project_file %1%, type_3mf %2%") % is_project_file % type_3mf;
+        
+        
         try {
             if (type_3mf) {
+                
+                varky++;
+                //wxGetApp().mainframe->output_through_framename(std::to_string(varky));
                 DynamicPrintConfig config;
                 Semver             file_version;
                 {
+
+                    
+                    
+
+
                     DynamicPrintConfig config_loaded;
 
                     // BBS: add part plate related logic
@@ -3589,6 +3984,7 @@ std::vector<size_t> Plater::priv::load_files(const std::vector<fs::path>& input_
                     std::vector<Preset *>     project_presets;
                     // BBS: backup & restore
                     q->skip_thumbnail_invalid = true;
+                   
                     model = Slic3r::Model::read_from_archive(path.string(), &config_loaded, &config_substitutions, en_3mf_file_type, strategy, &plate_data, &project_presets,
                                                              &file_version,
                                                              [this, &dlg, real_filename, &progress_percent, &file_percent, stage_percent, INPUT_FILES_RATIO, total_files, i,
@@ -3606,7 +4002,8 @@ std::vector<size_t> Plater::priv::load_files(const std::vector<fs::path>& input_
                     BOOST_LOG_TRIVIAL(info) << __FUNCTION__ << ":" << __LINE__
                                             << boost::format(", plate_data.size %1%, project_preset.size %2%, is_bbs_3mf %3%, file_version %4% \n") % plate_data.size() %
                                                    project_presets.size() % (en_3mf_file_type == En3mfType::From_BBS) % file_version.to_string();
-
+                   
+                   // wxGetApp().mainframe->output_through_framename(std::to_string(model.objects.size()));
                     // 1. add extruder for prusa model if the number of existing extruders is not enough
                     // 2. add extruder for BBS or Other model if only import geometry
                     if (en_3mf_file_type == En3mfType::From_Prusa || (load_model && !load_config)) {
@@ -3938,8 +4335,11 @@ std::vector<size_t> Plater::priv::load_files(const std::vector<fs::path>& input_
                     }
                     if (!silence) wxGetApp().app_config->update_config_dir(path.parent_path().string());
                 }
+                
             } else {
+                
                 // BBS: add plate data related logic
+               
                 PlateDataPtrs plate_data;
                 // BBS: project embedded settings
                 std::vector<Preset *> project_presets;
@@ -4018,7 +4418,7 @@ std::vector<size_t> Plater::priv::load_files(const std::vector<fs::path>& input_
                 GUI::show_error(q, e.what());
             continue;
         }
-
+        
         progress_percent = 100.0f * (float)i / (float)total_files + INIT_MODEL_RATIO * 100.0f / (float)total_files;
         dlg_cont = dlg.Update(progress_percent);
         if (!dlg_cont) {
@@ -4110,8 +4510,9 @@ std::vector<size_t> Plater::priv::load_files(const std::vector<fs::path>& input_
             q->skip_thumbnail_invalid = false;
             return empty_result;
         }
-
+       
         int model_idx = 0;
+        int a= 0;
         for (ModelObject *model_object : model.objects) {
             if (!type_3mf && !type_any_amf) model_object->center_around_origin(false);
 
@@ -4124,12 +4525,14 @@ std::vector<size_t> Plater::priv::load_files(const std::vector<fs::path>& input_
                 q->skip_thumbnail_invalid = false;
                 return empty_result;
             }
-            
+            a++;
             model_object->ensure_on_bed(is_project_file);
+            
         }
-
+       
+        
         tolal_model_count += model_idx;
-
+        //wxGetApp().mainframe->output_through_framename(std::to_string(tolal_model_count));
         progress_percent = 100.0f * (float)i / (float)total_files + LOAD_MODEL_RATIO * 100.0f / (float)total_files;
         dlg_cont = dlg.Update(progress_percent);
         if (!dlg_cont) {
@@ -4151,6 +4554,7 @@ std::vector<size_t> Plater::priv::load_files(const std::vector<fs::path>& input_
             }
             
             //Meta3D: Load objects here
+            //wxGetApp().mainframe->output_through_framename("hi");
             auto loaded_idxs = load_model_objects(model.objects, is_project_file, false, strategy, index);
             modelx.emplace_back(model);
             //model.objects[0]->printable= false;
@@ -4179,9 +4583,10 @@ std::vector<size_t> Plater::priv::load_files(const std::vector<fs::path>& input_
                 }
             }
         }
+         
     }
-
-
+   
+    
     if (new_model != nullptr && new_model->objects.size() > 1) {
         //BBS do not popup this dialog
         if (ask_multi) {
@@ -4301,7 +4706,9 @@ std::vector<size_t> Plater::priv::load_files(const std::vector<fs::path>& input_
     if (!designer_model_id.empty() && q->model().stl_design_id.empty()) {
         q->model().stl_design_id = designer_model_id;
     }
-
+    
+    //Meta3D: Here is the main problem with 3mf
+    //3mf and stl think needs to be fixed here
     if (tolal_model_count <= 0 && !q->m_exported_file) {
         dlg.Hide();
         if (!is_user_cancel) {
@@ -4320,15 +4727,20 @@ std::vector<size_t> Plater::priv::load_files(const std::vector<fs::path>& input_
     if(!load_to_idex_machine){
         if((preset_name=="Meta3D XPro - MIRROR"))
         {
+            wxGetApp().mainframe->output_through_framename("hi");
+
             load_idex(LoadStrategy::IdexMirror, load_to_idex_machine);
         }
         else if(preset_name=="Meta3D XPro - COPY"){
+                       wxGetApp().mainframe->output_through_framename("hi");
+
             load_idex(LoadStrategy::IdexCopy, load_to_idex_machine);
         }
     }
-
+     
+    
     return obj_idxs;
-}
+} 
 
  #define AUTOPLACEMENT_ON_LOAD
 
@@ -4348,7 +4760,7 @@ std::vector<size_t> Plater::priv::load_model_objects(const ModelObjectPtrs& mode
     q->set_bed_dims(bed_size);
     if(idex_toggle)
         remove_idex();
-    
+    //wxGetApp().mainframe->output_through_framename(std::to_string(wxGetApp().plater()->get_load_offset()));
     
 #ifndef AUTOPLACEMENT_ON_LOAD
     // bool need_arrange = false;
@@ -4455,16 +4867,16 @@ std::vector<size_t> Plater::priv::load_model_objects(const ModelObjectPtrs& mode
         auto start_point = this->bed.build_volume().bounding_volume2d().center();
         bool plate_empty = partplate_list.get_curr_plate()->empty();
         Vec3d displacement;
-        //Meta3D: Very very ugly if statements, i am sorry 
+        //Meta3D: Load idex objects
         if(strategy == LoadStrategy::IdexMirror)
         {
-            if(load_in_mirror&&(index ==q->load_offset - 1))
-            {
-                auto empty_cell = wxGetApp().plater()->canvas3D()->get_nearest_empty_cell({start_point(0), start_point(1)});
-                displacement    = {empty_cell.x(), empty_cell.y(), offset(2)};
+            //if(load_in_mirror&&(index ==q->load_offset - 1))
+            //{
+            //    auto empty_cell = wxGetApp().plater()->canvas3D()->get_nearest_empty_cell({start_point(0), start_point(1)});
+            //    displacement    = {empty_cell.x(), empty_cell.y(), offset(2)};
                 
-            }
-            else{
+            //}
+            //else{
                 GLVolume* v =q->canvas3D()->get_volumes().volumes[index];
                 Vec3d xd = v->get_instance_transformation().get_offset();
                 Vec3d instance_rotation = v->get_instance_transformation().get_rotation();
@@ -4474,7 +4886,7 @@ std::vector<size_t> Plater::priv::load_model_objects(const ModelObjectPtrs& mode
                 instance->set_rotation(instance_rotation);
                 instance->set_mirror({ -1.0, 1.0, 1.0 });
                 displacement = {bed_size.x() - xd.x(),xd.y(),xd.z()};
-            }
+            //}
 
         }
         else if(strategy == LoadStrategy::IdexCopy)
@@ -4901,15 +5313,7 @@ void Plater::priv::reset(bool apply_presets_change)
     m_saved_timestamp = m_backup_timestamp = size_t(-1);
 
     // Save window layout
-    if (sidebar_layout.is_enabled) {
-        // Reset show state
-        auto& sidebar = m_aui_mgr.GetPane(this->sidebar);
-        if (!sidebar_layout.is_collapsed && !sidebar.IsShown()) {
-            sidebar.Show();
-        }
-        auto layout = m_aui_mgr.SavePerspective();
-        wxGetApp().app_config->set("window_layout", layout.utf8_string());
-    }
+   
 }
 
 void Plater::priv::center_selection()
@@ -6094,6 +6498,7 @@ void Plater::priv::set_current_panel(wxPanel* panel, bool no_slice)
     //BBS: add the collapse logic
     if (panel == preview && q->only_gcode_mode()) {
         this->enable_sidebar(false);
+        this->enable_chatframe(false);
         preview->get_canvas3d()->enable_select_plate_toolbar(false);
     }
     else if (panel == preview && q->using_exported_file() && (q->m_valid_plates_count <= 1)) {
@@ -6981,9 +7386,11 @@ void Plater::priv::on_action_slice_all(SimpleEvent&)
 void Plater::priv::on_select_idex()
 {
     std::string preset_name = wxGetApp().preset_bundle->printers.get_selected_preset().name;
+    //wxGetApp().mainframe->output_through_framename("HERE");
     if(preset_name == "Meta3D XPro - MIRROR")
     {
-         stupid++;
+       
+        stupid++;
         idex_files_vector.clear();
         int index = 0;
         for(auto& object : model.objects)
@@ -6999,7 +7406,7 @@ void Plater::priv::on_select_idex()
         m_strategy = LoadStrategy::IdexMirror;
     }
     else if(preset_name == "Meta3D XPro - COPY"){
-         stupid++;
+        stupid++;
         idex_files_vector.clear();
         int index = 0;
         for(auto& object : model.objects)
@@ -7024,7 +7431,7 @@ void Plater::priv::on_select_idex()
 }
 void Plater::priv::load_idex(LoadStrategy strategy, bool load_to_idex_machine)
 {
-    //wxGetApp().ma
+    
     int temp_index = 0;
     if(idex_files_vector.empty())
         return;
@@ -7033,6 +7440,7 @@ void Plater::priv::load_idex(LoadStrategy strategy, bool load_to_idex_machine)
 
     for(auto& load: idex_files_vector)
     {
+       
         load_files(load, strategy,false, temp_index,true);
         temp_index++;
     }
@@ -7057,114 +7465,17 @@ void Plater::priv::remove_idex()
 
 void Plater::priv::on_action_idex_copy(SimpleEvent&)
 {
-
+    update_chatframe();
+  
+  
+    // //wxGetApp().mainframe->output_through_framename(q->p->config->option<ConfigOptionString>("bed_custom_model")->value);
+    // wxGetApp().get_tab(Preset::TYPE_PRINT)->get_config_manipulation();
+    // DynamicPrintConfig new_conf = *wxGetApp().get_tab(Preset::TYPE_PRINT)->m_config;
+    // new_conf.set_key_value("initial_layer_line_width", new ConfigOptionFloatOrPercent(43, false));
+    // new_conf.set_key_value("sparse_infill_pattern", new ConfigOptionEnum<InfillPattern>(ipArchimedeanChords));
+    // wxGetApp().get_tab(Preset::TYPE_PRINT)->get_config_manipulation().apply(wxGetApp().get_tab(Preset::TYPE_PRINT)->m_config,&new_conf);
     
-    wxGetApp().mainframe->output_through_framename(std::to_string(stupid));
-    //std::string preset_name = wxGetApp().preset_bundle->printers.get_selected_preset().name;
-    //model.objects.erase();
-    
-    //size_t a = 0;
-    //model.delete_object(a);
-    //update();
-
-    /*
-    if(!idex_toggle)
-    {
-        int temp_index = 0;
-        if(idex_files_vector.empty())
-            return;
-
-        for(auto& load: idex_files_vector)
-        {
-            load_files(load, LoadStrategy::IdexCopy,false, temp_index);
-            temp_index++;
-
-        }
-        idex_toggle = true;
-        
-
-    }
-    
-    if(idex_toggle)
-    {
-       
-        //for(int i = q->load_offset; i<2* q->load_offset;i++)
-        //    remove(q->load_offset);
-      
-
-        idex_toggle = false;
-    }
-    //wxGetApp().plater()->p->load_offset;
-    */
-
-    
-    //idex_files_vector[1].size();
-
-
-    /*
-    const Vec3d bed_size = Slic3r::to_3d(this->bed.build_volume().bounding_volume2d().size(), 1.0) - 2.0 * Vec3d::Ones(); //Meta3D: Get bed_size for offsetting the x axis   
-    if(!idex){
-         idex= true;
-        int index= 0;
-        int dumb = 0;
-        for(Model mod:modelx){
-            for(ModelObject* obj: mod.objects)
-            {   
-
-                dumb++;
-                auto *object = q->model().add_object(*obj);//Meta3D: If 3mf object and isntance translation will active
-                for(ModelObject* obj: q->model().objects)
-                {
-                   // obj->scale(3,2,5);
-
-
-                }
-                ModelInstancePtrs new_instances;
-                //object->mirror(Axis::X);
-                //object->center_around_origin();
-                //object->translate({50, 50, 10});
-                object->printable=false;
-                object->ensure_on_bed(false);
-                //q->model().scale(2,2,2);
-                
-                if (object->instances.empty())
-                    new_instances.emplace_back(object->add_instance());
-                
-                //object->translate({50, 50, 0});
-                for(auto& instance : new_instances){     
-
-                    instance->printable = false;
-                    auto start_point = this->bed.build_volume().bounding_volume2d().center();
-                    GLVolume* v = q->canvas3D()->get_volumes().volumes[index];
-                    index++;  
-                    
-                    Vec3d xd = v->get_instance_transformation().get_offset();
-                    auto offset = instance->get_offset();
-                    //instance->set_offset({bed_size.x()-xd.x() + 2,xd.y(), xd.z()});  
-                    //instance->set_scaling_factor(Axis::X, 3.0);
-                    //instance->set_scaling_factor(Axis::Y, 3.0);
-                    //instance->set_scaling_factor(Axis::Z, 3.0);
-                }
-                update();
-                //object_list_changed();
-            }
-        }
-        //Vec2d vecvec;   
-        //vecvec = this->bed.build_volume().printable_area();
-             
-        
-        
-        //std::vector<GLVolume*> *ve = &(q->canvas3D()->get_volumes_not_const().volumes);
-        //ve->erase(ve->begin());
-         
-
-    }
-    else{
-    
-        //modelx.clear();
-        idex=false;
-    }
-    */
+  
 }
 void Plater::priv::on_action_publish(wxCommandEvent &event)
 {
@@ -7224,7 +7535,9 @@ void Plater::priv::on_tab_selection_changing(wxBookCtrlEvent& e)
 {
     const int new_sel = e.GetSelection();
     sidebar_layout.show = new_sel == MainFrame::tp3DEditor || new_sel == MainFrame::tpPreview;
+    chatframe_layout.show = new_sel == MainFrame::tp3DEditor || new_sel == MainFrame::tpPreview;
     update_sidebar();
+    //update_chatframe();
 }
 
 int Plater::priv::update_print_required_data(Slic3r::DynamicPrintConfig config, Slic3r::Model model, Slic3r::PlateDataPtrs plate_data_list, std::string file_name, std::string file_path)
@@ -7880,15 +8193,76 @@ void Plater::priv::reset_canvas_volumes()
     if (preview != nullptr)
         preview->get_canvas3d()->reset_volumes();
 }
+bool Plater::priv::init_collapse_chatframe()
+{
 
+    
+    if (wxGetApp().is_gcode_viewer())
+        return true;
+
+    if (collapse_chatbar.get_items_count() > 0)
+    {
+        //wxGetApp().mainframe->output_through_framename(std::to_string());
+        return true;
+    }
+        // already initialized
+        
+
+    BackgroundTexture::Metadata background_data;
+    background_data.filename = m_is_dark ? "toolbar_background_dark.png" : "toolbar_background.png";
+    background_data.left = 16;
+    background_data.top = 16;
+    background_data.right = 16;
+    background_data.bottom = 16;
+
+    if (!collapse_chatbar.init(background_data))
+        return false;
+
+    collapse_chatbar.set_layout_type(GLToolbar::Layout::Vertical);
+    collapse_chatbar.set_horizontal_orientation(GLToolbar::Layout::HO_Left);
+    collapse_chatbar.set_vertical_orientation(GLToolbar::Layout::VO_Top);
+    collapse_chatbar.set_border(5.0f);
+    collapse_chatbar.set_separator_size(5);
+    collapse_chatbar.set_gap_size(2);
+
+    collapse_chatbar.del_all_item();
+
+    GLToolbarItem::Data item;
+
+    item.name = "collapse_chatframe";
+    // set collapse svg name
+    item.icon_filename = "collapse.svg";
+    item.sprite_id = 0;
+    item.left.action_callback = []() {
+        wxGetApp().plater()->collapse_chatframe(!wxGetApp().plater()->is_chatframe_collapsed());
+    };
+
+    item.visible = true;
+
+    if (!collapse_chatbar.add_item(item))
+        return false;
+        
+
+    // Now "collapse" sidebar to current state. This is done so the tooltip
+    // is updated before the toolbar is first used.
+    wxGetApp().plater()->collapse_chatframe(wxGetApp().plater()->is_chatframe_collapsed());
+    return true;
+}
+
+
+//MR: Collapse button initiation
 bool Plater::priv::init_collapse_toolbar()
 {
     if (wxGetApp().is_gcode_viewer())
         return true;
 
     if (collapse_toolbar.get_items_count() > 0)
-        // already initialized
+    {
+        //wxGetApp().mainframe->output_through_framename(std::to_string());
         return true;
+    }
+        // already initialized
+        
 
     BackgroundTexture::Metadata background_data;
     background_data.filename = m_is_dark ? "toolbar_background_dark.png" : "toolbar_background.png";
@@ -7921,6 +8295,7 @@ bool Plater::priv::init_collapse_toolbar()
 
     if (!collapse_toolbar.add_item(item))
         return false;
+        
 
     // Now "collapse" sidebar to current state. This is done so the tooltip
     // is updated before the toolbar is first used.
@@ -8806,7 +9181,7 @@ int Plater::new_project(bool skip_confirm, bool silent, const wxString& project_
 
     Model m;
     model().load_from(m); // new id avoid same path name
-
+    //wxGetApp().mainframe->output_through_framename("selassm");
     //select first plate
     get_partplate_list().select_plate(0);
     SimpleEvent event(EVT_GLCANVAS_PLATE_SELECT);
@@ -8820,6 +9195,7 @@ int Plater::new_project(bool skip_confirm, bool silent, const wxString& project_
     p->select_view("topfront");
     p->camera.requires_zoom_to_bed = true;
     enable_sidebar(!m_only_gcode);
+    enable_chatframe(!m_only_gcode);
 
     up_to_date(true, false);
     up_to_date(true, true);
@@ -8887,8 +9263,8 @@ void Plater::load_project(wxString const& filename2,
     if (strategy & LoadStrategy::Restore)
         input_paths.push_back(into_u8(originfile));
 
-    std::vector<size_t> res = load_files(input_paths, strategy);
-
+    std::vector<size_t> res = load_files(input_paths, strategy); //Meta3D: Loads the project
+    //wxGetApp().mainframe->output_through_framename(std::to_string(res.size()));
     reset_project_dirty_initial_presets();
     update_project_dirty_from_presets();
     wxGetApp().preset_bundle->export_selections(*wxGetApp().app_config);
@@ -8920,6 +9296,7 @@ void Plater::load_project(wxString const& filename2,
     }
 
     enable_sidebar(!m_only_gcode);
+    enable_chatframe(!m_only_gcode);
 
     wxGetApp().app_config->update_last_backup_dir(model().get_backup_path());
     if (load_restore && !originfile.empty()) {
@@ -8940,6 +9317,7 @@ void Plater::load_project(wxString const& filename2,
 }
 
 // BBS: save logic
+//Meta3D: Save project functionn
 int Plater::save_project(bool saveAs)
 {
     //if (up_to_date(false, false)) // should we always save
@@ -8955,6 +9333,8 @@ int Plater::save_project(bool saveAs)
         return wxID_CANCEL;
 
     //BBS export 3mf without gcode
+
+    //Meta3D: Saves the project
     if (export_3mf(into_path(filename), SaveStrategy::SplitModel | SaveStrategy::ShareMesh | SaveStrategy::FullPathSources) < 0) {
         MessageDialog(this, _L("Failed to save the project.\nPlease check whether the folder exists online or if other programs open the project file."),
             _L("Save project"), wxOK | wxICON_WARNING).ShowModal();
@@ -10633,9 +11013,18 @@ bool Plater::is_view3D_overhang_shown() const { return p->is_view3D_overhang_sho
 void Plater::show_view3D_overhang(bool show)  {  p->show_view3D_overhang(show); }
 
 bool Plater::is_sidebar_enabled() const { return p->sidebar_layout.is_enabled; }
+bool Plater::is_chatframe_enabled() const { return p->chatframe_layout.is_enabled; }
+
 void Plater::enable_sidebar(bool enabled) { p->enable_sidebar(enabled); }
+void Plater::enable_chatframe(bool enabled) { p->enable_chatframe(enabled); }
 bool Plater::is_sidebar_collapsed() const { return p->sidebar_layout.is_collapsed; }
+bool Plater::is_chatframe_collapsed() const { return p->chatframe_layout.is_collapsed; }
+
+
+
 void Plater::collapse_sidebar(bool collapse) { p->collapse_sidebar(collapse); }
+void Plater::collapse_chatframe(bool collapse) { p->collapse_chatframe(collapse); }
+
 Sidebar::DockingState Plater::get_sidebar_docking_state() const { return p->get_sidebar_docking_state(); }
 
 void Plater::reset_window_layout() { p->reset_window_layout(); }
@@ -10659,7 +11048,7 @@ void Plater::reset_with_confirm()
         wxGetApp().mainframe->select_tab(size_t(0));
     }
 }
-
+//Meta3D: Here!
 // BBS: save logic
 int GUI::Plater::close_with_confirm(std::function<bool(bool)> second_check)
 {
@@ -10667,7 +11056,7 @@ int GUI::Plater::close_with_confirm(std::function<bool(bool)> second_check)
         if (second_check && !second_check(false)) return wxID_CANCEL;
         model().set_backup_path("");
         return wxID_NO;
-    }
+    } 
 
     MessageDialog dlg(static_cast<wxWindow*>(this), _L("The current project has unsaved changes, save it before continue?"),
         wxString(SLIC3R_APP_FULL_NAME) + " - " + _L("Save"), wxYES_NO | wxCANCEL | wxYES_DEFAULT | wxCENTRE);
@@ -11630,9 +12019,10 @@ int Plater::export_3mf(const boost::filesystem::path& output_path, SaveStrategy 
     // BBS: backup
     PresetBundle& preset_bundle = *wxGetApp().preset_bundle;
     std::vector<Preset*> project_presets = preset_bundle.get_current_project_embedded_presets();
-
+    //Meta3D: Store the new parameters here
     StoreParams store_params;
     store_params.path  = path_u8.c_str();
+    
     store_params.model = &p->model;
     store_params.plate_data_list = plate_data_list;
     store_params.export_plate_idx = export_plate_idx;
@@ -11646,6 +12036,7 @@ int Plater::export_3mf(const boost::filesystem::path& output_path, SaveStrategy 
     store_params.id_bboxes = plate_bboxes;//BBS
     store_params.project = &p->project;
     store_params.strategy = strategy | SaveStrategy::Zip64;
+
 
 
     // get type and color for platedata
@@ -12968,6 +13359,11 @@ void Plater::enable_view_toolbar(bool enable)
 bool Plater::init_collapse_toolbar()
 {
     return p->init_collapse_toolbar();
+}
+
+bool Plater::init_collapse_chatframe()
+{
+    return p->init_collapse_chatframe();
 }
 
 const Camera& Plater::get_camera() const

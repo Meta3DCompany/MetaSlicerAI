@@ -176,7 +176,7 @@ void Field::on_kill_focus()
     if (m_on_kill_focus!=nullptr)
         m_on_kill_focus(m_opt_id);
 }
-
+//MR: Here is the change part of the values to options
 void Field::on_change_field()
 {
 //       std::cerr << "calling Field::_on_change \n";
@@ -854,9 +854,9 @@ void CheckBox::msw_rescale()
     field->Rescale();
 }
 
-
+//MR: Here is important. Makes the spin component
 void SpinCtrl::BUILD() {
-    auto size = wxSize(def_width_wider() * m_em_unit, wxDefaultCoord);
+    auto size = wxSize(def_width_wider() * m_em_unit , wxDefaultCoord);
     if (m_opt.height >= 0) size.SetHeight(m_opt.height*m_em_unit);
     if (m_opt.width >= 0) size.SetWidth(m_opt.width*m_em_unit);
 
@@ -972,9 +972,10 @@ void SpinCtrl::BUILD() {
 	// recast as a wxWindow to fit the calling convention
 	window = dynamic_cast<wxWindow*>(temp);
 }
-
+//MR: Propage_value into model
 void SpinCtrl::propagate_value()
 {
+    
     if (suppress_propagation)
         return;
 

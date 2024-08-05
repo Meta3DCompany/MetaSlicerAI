@@ -230,7 +230,7 @@ struct SuggestedConfigCalibPAPattern
 
     const std::vector<std::pair<std::string, double>> nozzle_ratio_pairs{{"line_width", 112.5}, {"initial_layer_line_width", 140}};
 
-    const std::vector<std::pair<std::string, int>> int_pairs{{"skirt_loops", 0}, {"wall_loops", 3}};
+    const std::vector<std::pair<std::string, int>> int_pairs{{"skirt_loops", 0}, {"wall_loops", 4}};
 
     const std::pair<std::string, BrimType> brim_pair{"brim_type", BrimType::btNoBrim};
 };

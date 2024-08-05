@@ -229,6 +229,8 @@ void OptionsGroup::append_separator()
     m_lines.emplace_back(Line());
 }
 
+
+//MR: Here initiates the values of labels I assume
 void OptionsGroup::activate_line(Line& line)
 {
     if (line.is_separator())
@@ -562,11 +564,20 @@ void OptionsGroup::clear(bool destroy_custom_ctrl)
 
 Line OptionsGroup::create_single_option_line(const Option& option, const std::string& path/* = std::string()*/) const
 {
+
+    //MR: Here puts the line 
     wxString tooltip = _(option.opt.tooltip);
+  
     edit_tooltip(tooltip);
+    
 	Line retval{ _(option.opt.label), tooltip };
-	retval.label_path = path;
+
+    
+    retval.label_path = path;
     retval.append_option(option);
+    
+
+	
     return retval;
 }
 
@@ -599,6 +610,8 @@ Option ConfigOptionsGroup::get_option(const std::string& opt_key, int opt_index 
 	if (m_use_custom_ctrl) // fill group and category values just for options from Settings Tab
 	    wxGetApp().sidebar().get_searcher().add_key(opt_id, static_cast<Preset::Type>(this->config_type()), title, this->config_category());
 
+    //MR: Here can ben important
+    
 	return Option(*m_config->def()->get(opt_key), opt_id);
 }
 

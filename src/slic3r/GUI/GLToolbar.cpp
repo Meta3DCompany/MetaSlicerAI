@@ -1298,6 +1298,7 @@ void GLToolbar::render_background(float left, float top, float right, float bott
 
 void GLToolbar::render_arrow(const GLCanvas3D& parent, GLToolbarItem* highlighted_item)
 {
+    
     // arrow texture not initialized
     if (m_arrow_texture.get_id() == 0)
         return;

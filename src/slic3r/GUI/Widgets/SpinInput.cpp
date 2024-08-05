@@ -44,7 +44,8 @@ SpinInput::SpinInput(wxWindow *parent,
     Create(parent, text, label, pos, size, style, min, max, initial);
 }
 
-void SpinInput::Create(wxWindow *parent, 
+//MR: Spin control
+void SpinInput::Create(wxWindow *parent,  
                      wxString       text,
                      wxString       label,
                      const wxPoint &pos,
@@ -317,6 +318,7 @@ void SpinInput::keyPressed(wxKeyEvent &event)
         break;
     default: event.Skip(); break;
     }
+    
 }
 
 void SpinInput::sendSpinEvent()

@@ -102,7 +102,7 @@ wxDECLARE_EVENT(EVT_DPI_CHANGED_SLICER, DpiChangedEvent);
 #endif // !wxVERSION_EQUAL_OR_GREATER_THAN
 
 extern std::deque<wxDialog*> dialogStack;
-
+//Meta3D: DPI
 template<class P> class DPIAware : public P
 {
 public:

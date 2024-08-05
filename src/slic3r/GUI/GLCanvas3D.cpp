@@ -1022,6 +1022,7 @@ wxDEFINE_EVENT(EVT_GLCANVAS_JUMP_TO, wxKeyEvent);
 wxDEFINE_EVENT(EVT_GLCANVAS_UNDO, SimpleEvent);
 wxDEFINE_EVENT(EVT_GLCANVAS_REDO, SimpleEvent);
 wxDEFINE_EVENT(EVT_GLCANVAS_COLLAPSE_SIDEBAR, SimpleEvent);
+wxDEFINE_EVENT(EVT_GLCANVAS_COLLAPSE_CHATFRAME, SimpleEvent);//MR: Making of collapse  button of chatframe
 wxDEFINE_EVENT(EVT_GLCANVAS_RELOAD_FROM_DISK, SimpleEvent);
 wxDEFINE_EVENT(EVT_GLCANVAS_RENDER_TIMER, wxTimerEvent/*RenderTimerEvent*/);
 wxDEFINE_EVENT(EVT_GLCANVAS_TOOLBAR_HIGHLIGHTER_TIMER, wxTimerEvent);
@@ -4493,7 +4494,7 @@ void GLCanvas3D::set_tooltip(const std::string& tooltip)
     if (m_canvas != nullptr)
         m_tooltip.set_text(tooltip);
 }
-//Meta3D: Messy idex translate function
+//Meta3D:  idex translate function
 void GLCanvas3D::do_move(const std::string& snapshot_type)
 {
     //const Vec3d bed_size = Slic3r::to_3d(bed.build_volume().bounding_volume2d().size(), 1.0) - 2.0 * Vec3d::Ones();
@@ -4512,80 +4513,49 @@ void GLCanvas3D::do_move(const std::string& snapshot_type)
     else
         div = 1;
      
-
     std::set<std::pair<int, int>> done;  // keeps track of modified instances
     bool object_moved = false;
-
-    // BBS: support wipe-tower for multi-plates
+    // Meta3D: support wipe-tower for multi-plates
     int n_plates = wxGetApp().plater()->get_partplate_list().get_plate_count();
     std::vector<Vec3d> wipe_tower_origins(n_plates, Vec3d::Zero());
 
     Selection::EMode selection_mode = m_selection.get_mode();
     int load_offset = wxGetApp().plater()->get_load_offset();
-    Vec3d bed_dims = wxGetApp().plater()->get_bed_dims();
-
-    
+    Vec3d bed_dims = wxGetApp().plater()->get_bed_dims(); 
     for (int i = 0; i< m_volumes.volumes.size()/div; i++) {
-
-       
         const GLVolume* v = m_volumes.volumes[i];
         int object_idx = v->object_idx();
         int instance_idx = v->instance_idx();
         int volume_idx = v->volume_idx();
-        
-
         if (volume_idx < 0)
             continue;
 
         std::pair<int, int> done_id(object_idx, instance_idx);
-        
         if (0 <= object_idx && object_idx < (int)m_model->objects.size()) {
-            
             done.insert(done_id);
             ModelObject *idex_object;
-          
             // Move instances/volumes
             ModelObject* model_object = m_model->objects[object_idx];
             if(if_idex)
                 idex_object= m_model->objects[object_idx+wxGetApp().plater()->get_load_offset()];
-            
-                
             if (model_object != nullptr ) {
                  
                 if (selection_mode == Selection::Instance)
                 {
-                   
-                    //Meta3D: When an object is dragged this function is called
-                    //if(250-v->get_instance_offset().x()>125){ //Meta3D: This statement will change, holder for logic check
                     model_object->instances[instance_idx]->set_transformation(v->get_instance_transformation());
-
                     if(strategy== LoadStrategy::IdexMirror){
                         idex_object->instances[instance_idx]->set_offset({bed_dims.x()-v->get_instance_offset().x(),v->get_instance_offset().y(),v->get_instance_offset().z()});
-                        //if(wxGetApp().plater()->get_load_offset()>0)
-                            //idex_load_object->instances[instance_idx]->set_offset({250-v->get_instance_offset().x(),v->get_instance_offset().y(),v->get_instance_offset().z()});
                     }
                     else if(strategy == LoadStrategy::IdexCopy){
                         idex_object->instances[instance_idx]->set_offset({(bed_dims.x()/2)+v->get_instance_offset().x(),v->get_instance_offset().y(),v->get_instance_offset().z()});
-                        //if(wxGetApp().plater()->get_load_offset()>0)
-                            //idex_load_object->instances[instance_idx]->set_offset({250-v->get_instance_offset().x(),v->get_instance_offset().y(),v->get_instance_offset().z()});
                     }
-
-
-                    //}
-                    //idex_object->instances[instance_idx]->set_offset(model_object->instances[instance_idx]->get_offset());
-
-                    //wxGetApp().mainframe->output_through_framename(m_model->objects.size()); //Meta3D: Get object coordinates when moving objects
-                    //xwxGetApp().mainframe->plater()->test(45);
-                    //idex_object->instances[0]->set_offset({50,50,10});
-                    //idex_object->instances[instance_idx]->set_transformation(v->get_instance_transformation());
-                    //m_model->objects[object_idx+1]->instances[instance_idx]->set_transformation(v->get_instance_transformation());
                 }
                 else if (selection_mode == Selection::Volume) {
                     if (model_object->volumes[volume_idx]->get_transformation() != v->get_volume_transformation()) {
                         model_object->volumes[volume_idx]->set_transformation(v->get_volume_transformation());
-                        // BBS: backup
+                        // Meta3D: backup
                         Slic3r::save_object_mesh(*model_object);
-                        //wxGetApp().mainframe->output_through_framename(3232);
+                       
                     }
                 }
 
@@ -4647,6 +4617,16 @@ void GLCanvas3D::do_move(const std::string& snapshot_type)
 
 void GLCanvas3D::do_rotate(const std::string& snapshot_type)
 {
+  const LoadStrategy strategy = wxGetApp().plater()->get_load_strategy();
+    bool if_idex = wxGetApp().plater()->get_idex_copy();
+    int div;
+
+    if(if_idex)
+        div = 2;
+    else
+        div = 1;
+     
+    
     if (m_model == nullptr)
         return;
 
@@ -4674,7 +4654,8 @@ void GLCanvas3D::do_rotate(const std::string& snapshot_type)
 
     Selection::EMode selection_mode = m_selection.get_mode();
 
-    for (const GLVolume* v : m_volumes.volumes) {
+    for (int i = 0; i< m_volumes.volumes.size()/div; i++) {
+        const GLVolume* v = m_volumes.volumes[i];
         const int object_idx = v->object_idx();
         if (object_idx < 0 || (int)m_model->objects.size() <= object_idx)
             continue;
@@ -4689,9 +4670,23 @@ void GLCanvas3D::do_rotate(const std::string& snapshot_type)
 
         // Rotate instances/volumes.
         ModelObject* model_object = m_model->objects[object_idx];
+        ModelObject *idex_object;
+        if(if_idex)
+            idex_object= m_model->objects[object_idx+wxGetApp().plater()->get_load_offset()];
+
         if (model_object != nullptr) {
             if (selection_mode == Selection::Instance)
+            {
                 model_object->instances[instance_idx]->set_transformation(v->get_instance_transformation());
+                
+                if(strategy== LoadStrategy::IdexMirror||strategy == LoadStrategy::IdexCopy)
+                {
+                    idex_object->instances[instance_idx]->set_rotation({v->get_instance_rotation().x(),v->get_instance_rotation().y(),v->get_instance_rotation().z()});
+                    idex_object->ensure_on_bed(false);
+
+                }
+                
+            }
             else if (selection_mode == Selection::Volume) {
                 if (model_object->volumes[volume_idx]->get_transformation() != v->get_volume_transformation()) {
                 	model_object->volumes[volume_idx]->set_transformation(v->get_volume_transformation());
@@ -4741,6 +4736,7 @@ void GLCanvas3D::do_scale(const std::string& snapshot_type)
         wxGetApp().plater()->take_snapshot(snapshot_type);
 
     // stores current min_z of instances
+    Vec3d bed_dims = wxGetApp().plater()->get_bed_dims(); 
     std::map<std::pair<int, int>, double> min_zs;
     if (!snapshot_type.empty()) {
         for (int i = 0; i < static_cast<int>(m_model->objects.size()); ++i) {
@@ -4750,16 +4746,28 @@ void GLCanvas3D::do_scale(const std::string& snapshot_type)
             }
         }
     }
+    bool if_idex = wxGetApp().plater()->get_idex_copy();
+     const LoadStrategy strategy = wxGetApp().plater()->get_load_strategy();
+    int div;
+
+    if(if_idex)
+        div = 2;
+    else
+        div = 1;
+
+    int load_offset = wxGetApp().plater()->get_load_offset();
 
     std::set<std::pair<int, int>> done;  // keeps track of modified instances
 
     Selection::EMode selection_mode = m_selection.get_mode();
 
-    for (const GLVolume* v : m_volumes.volumes) {
+    for (int i = 0; i< m_volumes.volumes.size()/div; i++) {
+         const GLVolume* v = m_volumes.volumes[i];
         const int object_idx = v->object_idx();
         if (object_idx < 0 || (int)m_model->objects.size() <= object_idx)
             continue;
 
+        
         const int instance_idx = v->instance_idx();
         const int volume_idx = v->volume_idx();
 
@@ -4768,11 +4776,28 @@ void GLCanvas3D::do_scale(const std::string& snapshot_type)
 
         done.insert(std::pair<int, int>(object_idx, instance_idx));
 
-        // Rotate instances/volumes
+        // Meta3D: Rotate instances/volumes
         ModelObject* model_object = m_model->objects[object_idx];
+         ModelObject *idex_object;
+         if(if_idex)
+                idex_object= m_model->objects[object_idx+wxGetApp().plater()->get_load_offset()];
         if (model_object != nullptr) {
             if (selection_mode == Selection::Instance)
+            {
+                //Meta3D: ensure_on_bed could be used here
                 model_object->instances[instance_idx]->set_transformation(v->get_instance_transformation());
+                if(strategy== LoadStrategy::IdexMirror)
+                {
+                        idex_object->instances[instance_idx]->set_transformation(v->get_instance_transformation());
+                        idex_object->instances[instance_idx]->set_offset({bed_dims.x()-v->get_instance_offset().x(),v->get_instance_offset().y(),v->get_instance_offset().z()});
+                        idex_object->instances[instance_idx]->set_mirror({ -1.0, 1.0, 1.0 });
+                }
+                else if(strategy == LoadStrategy::IdexCopy){
+                    idex_object->instances[instance_idx]->set_transformation(v->get_instance_transformation());
+                        idex_object->instances[instance_idx]->set_offset({bed_dims.x()/2+v->get_instance_offset().x(),v->get_instance_offset().y(),v->get_instance_offset().z()});
+                }
+            }
+
             else if (selection_mode == Selection::Volume) {
                 if (model_object->volumes[volume_idx]->get_transformation() != v->get_volume_transformation()) {
                     model_object->instances[instance_idx]->set_transformation(v->get_instance_transformation());
@@ -6116,6 +6141,8 @@ void GLCanvas3D::_switch_toolbars_icon_filename()
         item->set_icon_filename(m_is_dark ? "toolbar_assemble_dark.svg" : "toolbar_assemble.svg");
     }
 }
+
+//MR: Initiating of toolbars, I will initiate a chatbot window just like a toolabar
 bool GLCanvas3D::_init_toolbars()
 {
     if (!_init_main_toolbar())
@@ -6141,6 +6168,10 @@ bool GLCanvas3D::_init_toolbars()
 
     if (!_init_collapse_toolbar())
         return false;
+
+    if (!_init_collapse_chatframe())
+        return false;
+
 
     return true;
 }
@@ -6454,6 +6485,12 @@ bool GLCanvas3D::_init_collapse_toolbar()
     return wxGetApp().plater()->init_collapse_toolbar();
 }
 
+bool GLCanvas3D::_init_collapse_chatframe()
+{
+    return wxGetApp().plater()->init_collapse_chatframe();
+}
+
+
 bool GLCanvas3D::_set_current()
 {
     return m_context != nullptr && m_canvas->SetCurrent(*m_context);
@@ -6574,6 +6611,7 @@ void GLCanvas3D::_picking_pass()
                                                                                                       ClippingPlane::ClipsNothing())
                                              .inverted_normal();
     const SceneRaycaster::HitResult hit = m_scene_raycaster.hit(m_mouse.position, wxGetApp().plater()->get_camera(), &clipping_plane);
+    //Meta3D: Fix this for 3mf files 
     if (hit.is_valid()) {
         switch (hit.type)
         {
@@ -6587,18 +6625,29 @@ void GLCanvas3D::_picking_pass()
                     {
                         //Meta3D: Selects volume id's by raycasting, it does not select idex elements. It is a very silly way!
                         int unselectable_id = wxGetApp().plater()->get_load_offset();
+                       
+                        std::string preset_name = wxGetApp().preset_bundle->printers.get_selected_preset().name;
+                        // wxGetApp().mainframe->output_through_framename(preset_name);
                         std::vector<int> excluded_ids;
+                        bool isIdexPrinter = false;
+
+                        if(preset_name == "Meta3D XPro - COPY" || preset_name == "Meta3D XPro - MIRROR")
+                        {
+                            isIdexPrinter = true;
+                        }
+
                         for(int i = unselectable_id; i < 2*unselectable_id;i++)
                             excluded_ids.push_back(i);
                         //wxGetApp().mainframe->output_through_framename(unselectable_objs);
                         //for(int i =unselectable_objs; i< 2*unselectable_objs; i++)
                         //{
                         auto it =std::find(excluded_ids.begin(),excluded_ids.end(),hit.raycaster_id);
-                        bool found =true;;
+                        bool found =true;
+
                         if(it == excluded_ids.end())
                             found = false;
 
-                        if(!found)
+                        if(!found|| !isIdexPrinter)
                             m_hover_volume_idxs.emplace_back(hit.raycaster_id);
                             
                        // }
@@ -7552,7 +7601,7 @@ void GLCanvas3D::_render_gizmos_overlay()
         m_gizmos.render_arrow(*this, m_gizmo_highlighter.m_gizmo_type);
     }
 }
-
+//MR: The offset between button and toolbar
 float GLCanvas3D::get_main_toolbar_offset() const
 {
     const float cnv_width              = get_canvas_size().get_width();
@@ -8009,6 +8058,7 @@ void GLCanvas3D::_render_separator_toolbar_left() const
     m_separator_toolbar.render(*this,GLToolbarItem::SeparatorLine);
 }
 
+//MR: Render collapse toolbar button
 void GLCanvas3D::_render_collapse_toolbar() const
 {
     auto&      plater              = *wxGetApp().plater();

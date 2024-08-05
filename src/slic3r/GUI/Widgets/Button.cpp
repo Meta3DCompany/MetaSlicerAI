@@ -14,6 +14,8 @@ EVT_KEY_UP(Button::keyDownUp)
 // catch paint events
 EVT_PAINT(Button::paintEvent)
 
+EVT_LEAVE_WINDOW(Button::mouseLeave)
+
 END_EVENT_TABLE()
 
 /*
@@ -325,3 +327,12 @@ WXLRESULT Button::MSWWindowProc(WXUINT nMsg, WXWPARAM wParam, WXLPARAM lParam)
 #endif
 
 bool Button::AcceptsFocus() const { return canFocus; }
+
+void Button::mouseLeave(wxMouseEvent& event)
+{
+   //state_handler.set_state(StateHandler::Hovered, StateHandler::Checked);
+    pressedDown = false;
+   
+    Refresh();
+    event.Skip();
+}

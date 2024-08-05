@@ -1464,7 +1464,7 @@ void PrintConfigDef::init_fff_params()
     def->set_default_value(new ConfigOptionFloats { 0.02 });
 
     def = this->add("line_width", coFloatOrPercent);
-    def->label = L("Default");
+    def->label = L("Default"); //MR: Default option of line width
     def->category = L("Quality");
     def->tooltip = L("Default line width if other line widths are set to 0. If expressed as a %, it will be computed over the nozzle diameter.");
     def->sidetext = L("mm or %");
@@ -1793,7 +1793,7 @@ def = this->add("filament_loading_speed", coFloats);
     def->set_default_value(new ConfigOptionPercent(20));
 
     def = this->add("sparse_infill_pattern", coEnum);
-    def->label = L("Sparse infill pattern xddd");
+    def->label = L("Sparse infill pattern");
     def->category = L("Strength");
     def->tooltip = L("Line pattern for internal sparse infill");
     def->enum_keys_map = &ConfigOptionEnum<InfillPattern>::get_enum_values();
@@ -2994,7 +2994,7 @@ def = this->add("filament_loading_speed", coFloats);
     def->set_default_value(new ConfigOptionFloat(60));
 
     def = this->add("wall_loops", coInt);
-    def->label = L("Wall loops");
+    def->label = L("Wall loops"); //Meta3D: Set the part for wall loops row
     def->category = L("Strength");
     def->tooltip = L("Number of walls of every layer");
     def->min = 0;
