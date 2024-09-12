@@ -4512,7 +4512,10 @@ void GLCanvas3D::do_move(const std::string& snapshot_type)
         div = 2;
     else
         div = 1;
-     
+    
+
+    
+    std::cout <<"Div is "<<div<<std::endl;
     std::set<std::pair<int, int>> done;  // keeps track of modified instances
     bool object_moved = false;
     // Meta3D: support wipe-tower for multi-plates
@@ -4536,8 +4539,13 @@ void GLCanvas3D::do_move(const std::string& snapshot_type)
             ModelObject *idex_object;
             // Move instances/volumes
             ModelObject* model_object = m_model->objects[object_idx];
+            
             if(if_idex)
+            {
                 idex_object= m_model->objects[object_idx+wxGetApp().plater()->get_load_offset()];
+                idex_object->printable = false;
+            }
+           
             if (model_object != nullptr ) {
                  
                 if (selection_mode == Selection::Instance)
@@ -4545,9 +4553,12 @@ void GLCanvas3D::do_move(const std::string& snapshot_type)
                     model_object->instances[instance_idx]->set_transformation(v->get_instance_transformation());
                     if(strategy== LoadStrategy::IdexMirror){
                         idex_object->instances[instance_idx]->set_offset({bed_dims.x()-v->get_instance_offset().x(),v->get_instance_offset().y(),v->get_instance_offset().z()});
+                        idex_object->instances[instance_idx]->set_mirror({ -1.0, 1.0, 1.0 });
                     }
                     else if(strategy == LoadStrategy::IdexCopy){
                         idex_object->instances[instance_idx]->set_offset({(bed_dims.x()/2)+v->get_instance_offset().x(),v->get_instance_offset().y(),v->get_instance_offset().z()});
+                        
+                        idex_object->instances[instance_idx]->set_mirror({ 1.0, 1.0, 1.0 });
                     }
                 }
                 else if (selection_mode == Selection::Volume) {

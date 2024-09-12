@@ -181,10 +181,13 @@ using namespace nlohmann;
 
 static const std::pair<unsigned int, unsigned int> THUMBNAIL_SIZE_3MF = { 512, 512 };
 int varky = 0;
+bool if_type3mf = false;
+bool if_type3mf_flag = true;
+bool drag_new_project = false;
 namespace Slic3r {
 
 namespace GUI {
-std::vector<Model> modelx;
+//std::vector<Model> idex_model_vector;
 bool idex_toggle = false;
 LoadStrategy m_strategy = LoadStrategy::Default;
 bool load_in_mirror = false;
@@ -769,6 +772,24 @@ void ChatFrame::ProcessRasaResponse(const std::string& response, std::string& en
       
 }
 
+wxString ChatFrame::cleanBotResponse(const wxString& response) {
+    std::string responseSTD = std::string(response.mb_str(wxConvUTF8));
+
+        // Updated regex to match both $ENTITY and $OPERATION with any value
+        std::regex pattern(R"(\$ENTITY:\s*\w+|\$OPERATION:\s*\w+\(\))");
+
+        // Replace the matched patterns with an empty string
+        std::string cleanedResponse = std::regex_replace(responseSTD, pattern, "");
+
+        // Remove any extra spaces or commas left after removal
+        cleanedResponse = std::regex_replace(cleanedResponse, std::regex(R"(\s{2,})"), " ");
+        
+        // Trim leading/trailing spaces
+        cleanedResponse = std::regex_replace(cleanedResponse, std::regex(R"(^\s+|\s+$)"), "");
+
+        // Convert the cleaned std::string back to wxString and return
+        return wxString::FromUTF8(cleanedResponse.c_str());
+}
 
 void ChatFrame::OnSend(wxCommandEvent& event) {
     wxString userText = userInput->GetValue();
@@ -790,7 +811,8 @@ void ChatFrame::OnSend(wxCommandEvent& event) {
 
    
     chatDisplay->SetDefaultStyle(wxTextAttr(*wxWHITE));
-    chatDisplay->AppendText(botResponse + "\n");
+    wxString cleanedResponse = cleanBotResponse(botResponse);
+    chatDisplay->AppendText(cleanedResponse + "\n");
     std::string entity;
     std::string operation;
     std::string botResponseStr = botResponse.ToStdString(); 
@@ -2367,6 +2389,7 @@ struct Plater::priv
     Slic3r::GCodeProcessorResult gcode_result;
     std::vector<fs::path> idex_files;
     std::vector<std::vector<fs::path>> idex_files_vector;
+    std::vector<Slic3r::Model> idex_model_vector;
     std::vector<std::vector<fs::path>> one_offset_vector; //Meta3D: Terrible name, it is for adding to model in the idex presets
     // GUI elements
     AuiMgr m_aui_mgr;
@@ -2578,7 +2601,7 @@ struct Plater::priv
     BoundingBox scaled_bed_shape_bb() const;
 
     // BBS: backup & restore
-    std::vector<size_t> load_files(const std::vector<fs::path>& input_files, LoadStrategy strategy, bool ask_multi = false, int index = -1, bool load_to_idex_machine = false);
+    std::vector<size_t> load_files(const std::vector<fs::path>& input_files, LoadStrategy strategy, bool ask_multi = false, int index = -1, bool load_to_idex_machine = false, Slic3r::Model* modelPointer = nullptr);
     std::vector<size_t> load_model_objects(const ModelObjectPtrs& model_objects, bool allow_negative_z = false, bool split_object = false, LoadStrategy strategy = LoadStrategy::Default, int index =-1);
 
     fs::path get_export_file_path(GUI::FileType file_type);
@@ -3817,13 +3840,22 @@ std::string read_binary_stl(const std::string& filename) {
 // BBS: backup & restore
 
 //Meta3D: Here is important to fix 3mf
-std::vector<size_t> Plater::priv::load_files(const std::vector<fs::path>& input_files, LoadStrategy strategy, bool ask_multi, int index, bool load_to_idex_machine)
-{   
-    
+std::vector<size_t> Plater::priv::load_files(const std::vector<fs::path>& input_files, LoadStrategy strategy, bool ask_multi, int index, bool load_to_idex_machine, Slic3r::Model* modelPointer)
+{
+   
     
   
     std::string preset_name = wxGetApp().preset_bundle->printers.get_selected_preset().name;
+    wxGetApp().preset_bundle->filaments;
+    
+    //wxGetApp().preset_bundle->preset_collection;
     // wxGetApp().mainframe->output_through_framename(std::to_string(model.objects.size() ));
+    if(drag_new_project)
+        std::cout<<"Hello"<<std::endl;
+    else
+        std::cout<< "Bye bYe"<<std::endl;
+    
+    
     if((preset_name=="Meta3D XPro - MIRROR" ||preset_name=="Meta3D XPro - COPY")&& !load_to_idex_machine)
     {
         
@@ -3831,16 +3863,19 @@ std::vector<size_t> Plater::priv::load_files(const std::vector<fs::path>& input_
         //{
          //   q->load_offset = model.objects.size()/2;
         //}
+        std::cout<< "I am at load_files(), index is: "<< index<<std::endl;
+       
         remove_idex();
         load_in_mirror = true;
     
     }
-    if(!(strategy == LoadStrategy::IdexCopy|| strategy ==LoadStrategy::IdexMirror))     
+    if(!(strategy == LoadStrategy::IdexCopy|| strategy ==LoadStrategy::IdexMirror))
     {
+        std::cout<<"IT IS PUSHED"<<std::endl;
         idex_files_vector.push_back(input_files);
     }
 
-   // 
+   
 
 
     
@@ -3961,11 +3996,51 @@ std::vector<size_t> Plater::priv::load_files(const std::vector<fs::path>& input_
         bool is_project_file = false;
         BOOST_LOG_TRIVIAL(info) << __FUNCTION__ << boost::format(": is_project_file %1%, type_3mf %2%") % is_project_file % type_3mf;
         
-        
+     
         try {
             if (type_3mf) {
-                
+                if_type3mf = true;
                 varky++;
+                switch (strategy) {
+                        case LoadStrategy::Default:
+                            std::cout << "Handling default load strategy." << std::endl;
+                            break;
+                        case LoadStrategy::AddDefaultInstances:
+                            std::cout << "Adding default instances." << std::endl;
+                            break;
+                        case LoadStrategy::CheckVersion:
+                            std::cout << "Checking version." << std::endl;
+                            break;
+                        case LoadStrategy::LoadModel:
+                            std::cout << "Loading model." << std::endl;
+                            break;
+                        case LoadStrategy::LoadConfig:
+                            std::cout << "Loading configuration." << std::endl;
+                            break;
+                        case LoadStrategy::LoadAuxiliary:
+                            std::cout << "Loading auxiliary files." << std::endl;
+                            break;
+                        case LoadStrategy::Silence:
+                            std::cout << "Operating in silence mode." << std::endl;
+                            break;
+                        case LoadStrategy::ImperialUnits:
+                            std::cout << "Using imperial units." << std::endl;
+                            break;
+                        case LoadStrategy::IdexCopy:
+                            std::cout << "Executing IDEX copy operation." << std::endl;
+                            break;
+                        case LoadStrategy::IdexMirror:
+                            std::cout << "Executing IDEX mirror operation." << std::endl;
+                            break;
+                        case LoadStrategy::Restore:
+                            std::cout << "Restoring state with model, config, and auxiliary files." << std::endl;
+                            break;
+                        default:
+                            std::cout << "Unknown strategy." << std::endl;
+                            break;
+                    }
+                
+                std::cout << "LoadStrategy value: " << static_cast<int>(strategy) << std::endl;
                 //wxGetApp().mainframe->output_through_framename(std::to_string(varky));
                 DynamicPrintConfig config;
                 Semver             file_version;
@@ -3984,7 +4059,15 @@ std::vector<size_t> Plater::priv::load_files(const std::vector<fs::path>& input_
                     std::vector<Preset *>     project_presets;
                     // BBS: backup & restore
                     q->skip_thumbnail_invalid = true;
-                   
+                    
+                    //Meta3D: Load the second model without config when creating the idex.
+                    if(strategy == LoadStrategy::IdexMirror||strategy == LoadStrategy::IdexCopy)
+                    {
+                        std::cout<<"Load strategy if statement"<<std::endl;
+                        strategy = LoadStrategy::LoadModel;
+                    }
+                        
+                        
                     model = Slic3r::Model::read_from_archive(path.string(), &config_loaded, &config_substitutions, en_3mf_file_type, strategy, &plate_data, &project_presets,
                                                              &file_version,
                                                              [this, &dlg, real_filename, &progress_percent, &file_percent, stage_percent, INPUT_FILES_RATIO, total_files, i,
@@ -3999,10 +4082,29 @@ std::vector<size_t> Plater::priv::load_files(const std::vector<fs::path>& input_
                                                                  if (cancel)
                                                                      is_user_cancel = cancel;
                                                              });
+                    
+                
+                    if(strategy == LoadStrategy::IdexMirror)
+                        strategy = LoadStrategy::IdexMirror;
+                    else if(strategy == LoadStrategy::IdexCopy)
+                        strategy = LoadStrategy::IdexCopy;
+                        
+                    
+                    if((preset_name=="Meta3D XPro - MIRROR" ||preset_name=="Meta3D XPro - COPY"))
+                    {
+                        if(!(strategy == LoadStrategy::IdexCopy|| strategy ==LoadStrategy::IdexMirror)&&drag_new_project )
+                        {
+                            cout<<"In the resize condition, preset_name: " <<preset_name<<std::endl;
+                            model.objects.resize(model.objects.size()/2);
+                        }
+                    }
+                    
                     BOOST_LOG_TRIVIAL(info) << __FUNCTION__ << ":" << __LINE__
                                             << boost::format(", plate_data.size %1%, project_preset.size %2%, is_bbs_3mf %3%, file_version %4% \n") % plate_data.size() %
                                                    project_presets.size() % (en_3mf_file_type == En3mfType::From_BBS) % file_version.to_string();
-                   
+                    std::cout<<"Number of objects int the type_3mf: "<<model.objects.size()<<std::endl;
+                   if(!load_to_idex_machine)
+                   {
                    // wxGetApp().mainframe->output_through_framename(std::to_string(model.objects.size()));
                     // 1. add extruder for prusa model if the number of existing extruders is not enough
                     // 2. add extruder for BBS or Other model if only import geometry
@@ -4335,8 +4437,49 @@ std::vector<size_t> Plater::priv::load_files(const std::vector<fs::path>& input_
                     }
                     if (!silence) wxGetApp().app_config->update_config_dir(path.parent_path().string());
                 }
+                }
                 
             } else {
+                
+                if_type3mf = false;
+                switch (strategy) {
+                        case LoadStrategy::Default:
+                            std::cout << "Handling default load strategy." << std::endl;
+                            break;
+                        case LoadStrategy::AddDefaultInstances:
+                            std::cout << "Adding default instances." << std::endl;
+                            break;
+                        case LoadStrategy::CheckVersion:
+                            std::cout << "Checking version." << std::endl;
+                            break;
+                        case LoadStrategy::LoadModel:
+                            std::cout << "Loading model." << std::endl;
+                            break;
+                        case LoadStrategy::LoadConfig:
+                            std::cout << "Loading configuration." << std::endl;
+                            break;
+                        case LoadStrategy::LoadAuxiliary:
+                            std::cout << "Loading auxiliary files." << std::endl;
+                            break;
+                        case LoadStrategy::Silence:
+                            std::cout << "Operating in silence mode." << std::endl;
+                            break;
+                        case LoadStrategy::ImperialUnits:
+                            std::cout << "Using imperial units." << std::endl;
+                            break;
+                        case LoadStrategy::IdexCopy:
+                            std::cout << "Executing IDEX copy operation." << std::endl;
+                            break;
+                        case LoadStrategy::IdexMirror:
+                            std::cout << "Executing IDEX mirror operation." << std::endl;
+                            break;
+                        case LoadStrategy::Restore:
+                            std::cout << "Restoring state with model, config, and auxiliary files." << std::endl;
+                            break;
+                        default:
+                            std::cout << "Unknown strategy." << std::endl;
+                            break;
+                    }
                 
                 // BBS: add plate data related logic
                
@@ -4554,11 +4697,23 @@ std::vector<size_t> Plater::priv::load_files(const std::vector<fs::path>& input_
             }
             
             //Meta3D: Load objects here
-            //wxGetApp().mainframe->output_through_framename("hi");
+    
+            std::cout<< "I am at load_model_objects(), index is: "<<index <<std::endl;
+            std::cout<< "I am at load_model_objects(), moodel.objects size is: "<<model.objects.size() <<std::endl;
+            std::vector<size_t> indices;
+
+                // Populate the vector with values
+                for (size_t i = 0; i < 10; ++i) {
+                    indices.push_back(i);
+                }
             auto loaded_idxs = load_model_objects(model.objects, is_project_file, false, strategy, index);
-            modelx.emplace_back(model);
+            //if((strategy == LoadStrategy::IdexCopy||strategy == LoadStrategy::IdexMirror) &&type_3mf)
+                //load_model_objects(idex_model_vector[index].objects, is_project_file, false, strategy, index);
+            
+            
+            //idex_model_vector.emplace_back(model);
             //model.objects[0]->printable= false;
-            //load_model_objects(model.objects, is_project_file);
+            //load_model_objects(model.objects, is_project_file);x
        
             obj_idxs.insert(obj_idxs.end(), loaded_idxs.begin(), loaded_idxs.end());
 
@@ -4583,7 +4738,7 @@ std::vector<size_t> Plater::priv::load_files(const std::vector<fs::path>& input_
                 }
             }
         }
-         
+      
     }
    
     
@@ -4717,27 +4872,49 @@ std::vector<size_t> Plater::priv::load_files(const std::vector<fs::path>& input_
         }
     }
 
-    
+   
     
     if(!(strategy == LoadStrategy::IdexCopy ||strategy == LoadStrategy::IdexMirror)&&!load_to_idex_machine)     
     {
         q->load_offset++;
     }
+    //if((preset_name=="Meta3D XPro - MIRROR" ||preset_name=="Meta3D XPro - COPY") &&  if_type3mf && if_typeif_type3mf_flag)
+    //{
+        //std::cout <<"First if statement"<<std::endl;
+        //idex_files_vector.clear();
+       // idex_toggle = true;
+     //   if_type3mf_flag = false;
+   // }
     
     if(!load_to_idex_machine){
+        std::cout<<"load_to_idex_machine if statement"<<std::endl;
         if((preset_name=="Meta3D XPro - MIRROR"))
         {
-            wxGetApp().mainframe->output_through_framename("hi");
-
+            
             load_idex(LoadStrategy::IdexMirror, load_to_idex_machine);
         }
         else if(preset_name=="Meta3D XPro - COPY"){
-                       wxGetApp().mainframe->output_through_framename("hi");
-
+                     
             load_idex(LoadStrategy::IdexCopy, load_to_idex_machine);
         }
     }
-     
+        
+        //if((preset_name=="Meta3D XPro - MIRROR" ||preset_name=="Meta3D XPro - COPY")&&q->load_offset==0&&if_type3mf)
+        //{
+           // q->load_offset = this->model.objects.size()/2;
+           // remove_idex();
+          //  std::cout<<"i am here kleke"<<std::endl;
+        //}
+    if(idex_toggle)
+    {
+        auto modelObjects = model.objects;
+      
+        //for(int i =q->load_offset; q->load_offset< modelObjects.size();i++)
+        //{
+          //  modelObjects[i]->printable = false;
+        //}
+        
+    }
     
     return obj_idxs;
 } 
@@ -4755,13 +4932,21 @@ void Plater::test(double d)
 
 std::vector<size_t> Plater::priv::load_model_objects(const ModelObjectPtrs& model_objects, bool allow_negative_z, bool split_object, LoadStrategy strategy,int index)
 {
+
+   
     const Vec3d bed_size = Slic3r::to_3d(this->bed.build_volume().bounding_volume2d().size(), 1.0) - 2.0 * Vec3d::Ones();
+   
+    
     
     q->set_bed_dims(bed_size);
-    if(idex_toggle)
+    if(idex_toggle )
+    {
+        std::cout <<"Before remove_idex()"<<std::endl;
         remove_idex();
+    }
+       
     //wxGetApp().mainframe->output_through_framename(std::to_string(wxGetApp().plater()->get_load_offset()));
-    
+   
 #ifndef AUTOPLACEMENT_ON_LOAD
     // bool need_arrange = false;
 #endif /* AUTOPLACEMENT_ON_LOAD */
@@ -4772,12 +4957,19 @@ std::vector<size_t> Plater::priv::load_model_objects(const ModelObjectPtrs& mode
 #ifdef AUTOPLACEMENT_ON_LOAD
     ModelInstancePtrs new_instances;
 #endif /* AUTOPLACEMENT_ON_LOAD */
+   // std::cout <<"I am at load_model_objects model_objects size "<< model_objects.size() <<std::endl;
     for (ModelObject *model_object : model_objects) {
         auto *object = model.add_object(*model_object);
+        //model_object->instances[0]->printable = false;
+        
         object->sort_volumes(true);
+    
+        
         std::string object_name = object->name.empty() ? fs::path(object->input_file).filename().string() : object->name;
         obj_idxs.push_back(obj_count++);
-        
+    
+            
+     
         if (model_object->instances.empty()) {
 #ifdef AUTOPLACEMENT_ON_LOAD
             object->center_around_origin();
@@ -4795,8 +4987,11 @@ std::vector<size_t> Plater::priv::load_model_objects(const ModelObjectPtrs& mode
             instance->set_offset(Slic3r::to_3d(this->bed.build_volume().bed_center(), -object->origin_translation(2)));
 #endif /* AUTOPLACEMENT_ON_LOAD */
         }
+    
+        std::cout <<"Instances size: "<<object->instances.size()<<std::endl;
 
         //BBS: when the object is too large, let the user choose whether to scale it down
+        //Meta3D3mf: This for loop does not matter for basic placing models
         for (size_t i = 0; i < object->instances.size(); ++i) {
             ModelInstance* instance = object->instances[i];
             const Vec3d size = object->instance_bounding_box(i).size();
@@ -4859,10 +5054,22 @@ std::vector<size_t> Plater::priv::load_model_objects(const ModelObjectPtrs& mode
     // it remains to move the wipe tower:
     view3D->get_canvas3d()->arrange_wipe_tower(wti);
 #else
-    // Meta3D: find an empty cell to put the copied object
-    
-    for (auto& instance : new_instances) {
+            
+    if(false )
+    {
+        std::cout<<"It works xd, index is "<<index<<std::endl;
+            for(auto instance: model.objects[1]->instances)
+            {
+                //instance->printable = false;
+                instance->printable = false;
+            }
         
+    }
+    //strategy =LoadStrategy::IdexCopy;
+    // Meta3D: find an empty cell to put the copied object, this code is shitty
+    std::cout <<"I am at load_model_objects new_instances size "<< new_instances.size() <<std::endl;
+    for (auto& instance : new_instances) {
+        std::cout <<"I am at load_model_objects in new_instance foreach"<<std::endl;
         auto offset = instance->get_offset();
         auto start_point = this->bed.build_volume().bounding_volume2d().center();
         bool plate_empty = partplate_list.get_curr_plate()->empty();
@@ -4877,6 +5084,7 @@ std::vector<size_t> Plater::priv::load_model_objects(const ModelObjectPtrs& mode
                 
             //}
             //else{
+                std::cout <<"I am at load_model_objects IdexMirror"<<std::endl;
                 GLVolume* v =q->canvas3D()->get_volumes().volumes[index];
                 Vec3d xd = v->get_instance_transformation().get_offset();
                 Vec3d instance_rotation = v->get_instance_transformation().get_rotation();
@@ -4891,6 +5099,8 @@ std::vector<size_t> Plater::priv::load_model_objects(const ModelObjectPtrs& mode
         }
         else if(strategy == LoadStrategy::IdexCopy)
         {
+            
+            std::cout <<"I am at load_model_objects IdexCopy"<<std::endl;
             GLVolume* v =q->canvas3D()->get_volumes().volumes[index];
             Vec3d xd = v->get_instance_transformation().get_offset();
             Vec3d instance_rotation = v->get_instance_transformation().get_rotation();
@@ -4902,9 +5112,11 @@ std::vector<size_t> Plater::priv::load_model_objects(const ModelObjectPtrs& mode
         }
         else if (plate_empty){
             
+            std::cout <<"I am at load_model_objects plate_empty"<<std::endl;
             displacement = {start_point(0), start_point(1), offset(2)};
         }
         else {
+            std::cout <<"I am at load_model_objects just else"<<std::endl;
             auto empty_cell = wxGetApp().plater()->canvas3D()->get_nearest_empty_cell({start_point(0), start_point(1)});
             displacement    = {empty_cell.x(), empty_cell.y(), offset(2)};
         }
@@ -6818,18 +7030,23 @@ void Plater::priv::on_select_preset(wxCommandEvent &evt)
         //wxWindowUpdateLocker noUpdates1(sidebar->print_panel());
         wxWindowUpdateLocker noUpdates2(sidebar->filament_panel());
         wxGetApp().get_tab(preset_type)->select_preset(preset_name);
+       
         if(preset_name == "Meta3D XPro - MIRROR")
         {
+            std::cout<< "I am at on_select_preset() MIRROR"<<std::endl;
             load_idex(LoadStrategy::IdexMirror);
             m_strategy = LoadStrategy::IdexMirror;
         }
         else if(preset_name == "Meta3D XPro - COPY"){
+            std::cout<< "I am at on_select_preset() COPY"<<std::endl;
             load_idex(LoadStrategy::IdexCopy);
             m_strategy = LoadStrategy::IdexCopy;
         }
         else 
         {
+            std::cout<< "I am at on_select_preset()"<<std::endl;
             remove_idex();
+           
         }
         if(!(preset_name == "Meta3D XPro - COPY" ||preset_name == "Meta3D XPro - MIRROR"))
             m_strategy = LoadStrategy::Default;
@@ -7386,19 +7603,22 @@ void Plater::priv::on_action_slice_all(SimpleEvent&)
 void Plater::priv::on_select_idex()
 {
     std::string preset_name = wxGetApp().preset_bundle->printers.get_selected_preset().name;
-    //wxGetApp().mainframe->output_through_framename("HERE");
+    
     if(preset_name == "Meta3D XPro - MIRROR")
     {
-       
+        std::cout<<"I am at on_select_idex() MIRROR: "<<std::endl;
         stupid++;
         idex_files_vector.clear();
+        //idex_model_vector[0].objects.clear();
         int index = 0;
         for(auto& object : model.objects)
         {
+            std::cout<<"I am at on_select_idex() COPY: "<<std::endl;
             fs::path path(model.objects[index]->input_file);
             std::vector<fs::path> temp;
             temp.push_back(path);
             idex_files_vector.push_back(temp);
+            //idex_model_vector[0].objects.push_back(object);
             index++;
            
         }
@@ -7422,6 +7642,7 @@ void Plater::priv::on_select_idex()
     }
     else 
     {
+        std::cout<< "I am at on_select_idex()"<<std::endl;
         remove_idex();
     }
 
@@ -7433,15 +7654,20 @@ void Plater::priv::load_idex(LoadStrategy strategy, bool load_to_idex_machine)
 {
     
     int temp_index = 0;
+   
     if(idex_files_vector.empty())
         return;
+    
     if(partplate_list.get_curr_plate()->empty())
         return;
-
+    
+    std::cout << "IDEX files vector size is: "<< idex_files_vector.size()<<std::endl;
     for(auto& load: idex_files_vector)
     {
+        std::cout <<"I am at loading the files: "<<std::endl;
        
         load_files(load, strategy,false, temp_index,true);
+       // load_files(load, strategy,false, temp_index,true, idex_model_vector[0].objects)
         temp_index++;
     }
     idex_toggle = true;
@@ -7452,10 +7678,18 @@ void Plater::priv::load_idex(LoadStrategy strategy, bool load_to_idex_machine)
 
 void Plater::priv::remove_idex()
 {
+    
+    std::cout<<"Before idex_toggle if statement: "<<std::endl;
+    
+    
     if(!idex_toggle)
         return;
-
-   
+    
+    std::cout<< "Load offset to removed: ";
+    std::cout<<q->load_offset<<endl;
+    std::cout<< "Volume count of the model: ";
+    std::cout << q->canvas3D()->get_volumes().volumes.size()<<std::endl;
+    
     for(int i = q->load_offset; i<2* q->load_offset;i++)
             remove(q->load_offset);
     
@@ -7463,10 +7697,24 @@ void Plater::priv::remove_idex()
     idex_toggle = false;
 }
 
+
+//Meta3D: Button in the top
 void Plater::priv::on_action_idex_copy(SimpleEvent&)
 {
+    std::cout<<"Number of instances in the second object: "<<this->model.objects[1]->instances.size()<<std::endl;
+    
+    
+    //this->model.objects[1]->instances[0]->printable = false;
+ 
+    std::cout <<"Get load offset "<<q->get_load_offset()<<std::endl;
+    
+    //if(this->model.objects[1]->printable==true)
+        //std::cout<<"1st object is true"<<std::endl;
+    //else
+        //std::cout<<"1st object is false"<<std::endl;
+    
     update_chatframe();
-  
+    
   
     // //wxGetApp().mainframe->output_through_framename(q->p->config->option<ConfigOptionString>("bed_custom_model")->value);
     // wxGetApp().get_tab(Preset::TYPE_PRINT)->get_config_manipulation();
@@ -10772,10 +11020,14 @@ bool Plater::load_files(const wxArrayString& filenames)
             return false;
         }
     }
-
+   
     switch (loadfiles_type) {
     case LoadFilesType::Single3MF:
+            
+        
+        drag_new_project=true;
         open_3mf_file(normal_paths[0]);
+            
         break;
 
     case LoadFilesType::SingleOther: {
@@ -10784,6 +11036,7 @@ bool Plater::load_files(const wxArrayString& filenames)
         break;
     }
     case LoadFilesType::Multiple3MF:
+        drag_new_project=true;
         first_file = std::vector<fs::path>{normal_paths[0]};
         for (auto i = 0; i < normal_paths.size(); i++) {
             if (i > 0) { other_file.push_back(normal_paths[i]); }
@@ -10800,6 +11053,7 @@ bool Plater::load_files(const wxArrayString& filenames)
     }
 
     case LoadFilesType::Multiple3MFOther:
+        drag_new_project=true;
         for (const auto &path : normal_paths) {
             if (wxString(encode_path(path.filename().string().c_str())).EndsWith("3mf")) {
                 if (first_file.size() <= 0)
@@ -10817,6 +11071,8 @@ bool Plater::load_files(const wxArrayString& filenames)
         break;
     default: break;
     }
+    
+    drag_new_project=false;
 
     return res;
 }

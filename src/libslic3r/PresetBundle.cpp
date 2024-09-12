@@ -1675,11 +1675,18 @@ void PresetBundle::load_selections(AppConfig &config, const PresetPreferences& p
     {
         const std::string& prefered_print_profile = preferred_printer->config.opt_string("default_print_profile");
         if ((!initial_print_profile_name.compare("Default Setting")) && (prefered_print_profile.size() > 0))
+        {
+            std::cout<< "I am in Process statement"<<std::endl;
             initial_print_profile_name = prefered_print_profile;
+        }
+            
 
         const std::vector<std::string>& prefered_filament_profiles = preferred_printer->config.option<ConfigOptionStrings>("default_filament_profile")->values;
         if ((!initial_filament_profile_name.compare("Default Filament")) && (prefered_filament_profiles.size() > 0))
+        {
+            std::cout<< "I am in filament statement"<<std::endl;
             initial_filament_profile_name = prefered_filament_profiles[0];
+        }
     }
 
     // Selects the profile, leaves it to -1 if the initial profile name is empty or if it was not found.
@@ -3168,6 +3175,7 @@ std::pair<PresetsConfigSubstitutions, size_t> PresetBundle::load_vendor_configs_
             if (boost::iequals(it.key(), BBL_JSON_KEY_VERSION)) {
                 //get version
                 std::string version_str = it.value();
+     
                 auto config_version = Semver::parse(version_str);
                 if (! config_version) {
                     throw ConfigurationError((boost::format("vendor %1%'s config version: %2% invalid\nSuggest cleaning the directory %3% firstly")
@@ -3178,6 +3186,7 @@ std::pair<PresetsConfigSubstitutions, size_t> PresetBundle::load_vendor_configs_
             }
             else if (boost::iequals(it.key(), BBL_JSON_KEY_URL)) {
                 //get url
+         
                 vendor_profile.config_update_url = it.value();
             }
             else if (boost::iequals(it.key(), BBL_JSON_KEY_DESCRIPTION)) {

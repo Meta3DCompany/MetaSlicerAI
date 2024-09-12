@@ -1503,7 +1503,7 @@ wxBoxSizer* MainFrame::create_side_tools()
 
     // m_publish_btn = new Button(this, _L("Upload"), "bar_publish", 0, FromDIP(16));
     m_slice_btn = new SideButton(this, _L("Slice plate"), "");
-    m_idex_alpha = new Button(this, _L("MetaSlicerAI"), "");
+    m_idex_alpha = new Button(this, _L("Support3D"), "");
     StateColor btn_bg(
          std::pair<wxColour, int>(wxColour(204,139,0), StateColor::Pressed),
         std::pair<wxColour, int>(wxColour(255, 174, 0 ), StateColor::Hovered),

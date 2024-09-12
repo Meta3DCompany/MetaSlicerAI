@@ -289,7 +289,7 @@ private:
     void OnSend(wxCommandEvent& event);
     wxString CallChatbotAPI(const wxString& userText);
 
-
+    wxString cleanBotResponse(const wxString& response);
     void ProcessRasaResponse (const std::string& response, std::string& entity, std::string& operation);
     void onSendButtonClicked(wxCommandEvent& event);
     void onConnectButtonClicked(wxCommandEvent& event);

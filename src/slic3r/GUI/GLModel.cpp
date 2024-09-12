@@ -598,7 +598,7 @@ void GLModel::render()
 
 void GLModel::render(const std::pair<size_t, size_t>& range)
 {
-    std::cout << "i am here gl model render" <<std::endl;
+    //std::cout << "i am here gl model render" <<std::endl;
     if (m_render_disabled)
         return;
 

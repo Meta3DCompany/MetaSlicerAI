@@ -295,6 +295,7 @@ void SavePresetDialog::Item::DoSetSize(int x, int y, int width, int height, int 
 //          SavePresetDialog
 //-----------------------------------------------
 
+//Meta3D: Save preset in the printer settings
 SavePresetDialog::SavePresetDialog(wxWindow *parent, Preset::Type type, std::string suffix)
     : DPIDialog(parent, wxID_ANY, _L("Save preset"), wxDefaultPosition, wxDefaultSize, wxCAPTION | wxCLOSE_BOX)
 {
